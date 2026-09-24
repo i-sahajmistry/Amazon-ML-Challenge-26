@@ -1,8 +1,11 @@
 # EDA — ML Challenge 2026: Business Entity Resolution
 
-Exploratory analysis of `ML Hackathon dataset/student_resource/`. Every number below was
-measured on the actual files. Scripts are in [eda/](eda/) and cache parquet copies in
-`eda/cache/`. Rerun with `.venv/bin/python eda/<script>.py` from inside `eda/`.
+Exploratory analysis of `student_resource/`. Every number below was measured on the actual
+files. The scripts that produced them are in [eda/](eda/). To rerun one, `cd eda && python
+<script>.py`. They need pandas, pyarrow and rapidfuzz, and they read
+`student_resource/dataset` at the repo root (set `DATA_DIR` to point elsewhere). Parquet
+caches go to `eda/cache/`, which is gitignored. Run order: `load.py` → `profile.py`,
+`gt.py` → `join_pairs.py` → `samples.py`, `noise.py`, `peek.py`, `sim.py`, `blocking.py`.
 
 ## 1. The task in one paragraph
 
