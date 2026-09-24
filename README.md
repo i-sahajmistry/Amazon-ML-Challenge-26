@@ -7,6 +7,17 @@ Project name (shared, already approved): `scai`
 GPU queue: `scai_q` — NVIDIA A100 80GB PCIe, CUDA 13.2, max 2 concurrent jobs/user
 Program code for proxy (if not mtech, check table below): mtech = 62
 
+## Data
+Official `student_resource` zip (~1 GB), shared on Google Drive: https://drive.google.com/drive/folders/1QF5Wx8fuiap7aBsjYzTQYAU4FnDRcnuX?usp=drive_link
+
+Download and extract it at the repo root (on padum: `~/scratch/AmazonMLChallenge`, on the login node with the proxy from step 3):
+```
+curl -L -o 6ab10eb3b23ba_student_resource.zip "https://drive.usercontent.google.com/download?id=1De_3Cgg3C8jN1ULdiU_UxiQYiKt6NnU7&export=download&confirm=t"
+unzip -q 6ab10eb3b23ba_student_resource.zip
+rm -rf __MACOSX && find student_resource -name .DS_Store -delete
+```
+You get `student_resource/{dataset/{train,test},utils}`, the layout the code expects. The zip and `student_resource/` are gitignored.
+
 ## 1. Get HPC account
 1. Apply: https://userm.iitd.ernet.in/usermanage/hpc.html
 2. Login with your Kerberos ID/password
