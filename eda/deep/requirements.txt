@@ -1,0 +1,9 @@
+# Versions used for the deep EDA run on PADUM (Python 3.14). torch is only needed by 02_retrieval.py.
+numpy==2.5.3
+pandas==3.0.6
+pyarrow==25.0.1
+scipy==1.18.1
+scikit-learn==1.9.1
+rapidfuzz==3.14.6
+anyascii==0.3.3
+torch==2.10.0

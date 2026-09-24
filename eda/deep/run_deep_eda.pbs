@@ -1,0 +1,19 @@
+#!/bin/bash
+#PBS -N deep_eda
+#PBS -P scai
+#PBS -q scai_q
+#PBS -l select=1:ncpus=24:ngpus=1:mem=192gb
+#PBS -l walltime=04:00:00
+# Runs the deep EDA end to end on PADUM. Submit from the repo root:
+#   qsub -v PY=/path/to/env/bin/python eda/deep/run_deep_eda.pbs
+# PY defaults to `python` on PATH; it needs the packages in eda/deep/requirements.txt.
+# Data is read from student_resource/dataset (override with -v DATA_DIR=...).
+# Results go to eda/deep/out/ (gitignored). 03 needs the outputs of 01 and 02.
+set -e
+cd "$PBS_O_WORKDIR/eda/deep"
+PY=${PY:-python}
+export WORKERS=${NCPUS:-24} OMP_NUM_THREADS=1
+$PY -u 01_pair_noise.py
+$PY -u 04_vocab.py
+OMP_NUM_THREADS=8 $PY -u 02_retrieval.py
+$PY -u 03_blocking_eval.py

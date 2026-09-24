@@ -1,0 +1,1351 @@
+{
+ "n_pairs": 7638365,
+ "rates": {
+  "India|S2": {
+   "n_mixed_script": 0.00977,
+   "n_raw_eq": 0.02672,
+   "n_case_eq": 0.06365,
+   "n_norm_eq": 0.17468,
+   "n_core_eq": 0.43759,
+   "n_core_set_eq": 0.44776,
+   "n_reorder": 0.04999,
+   "n_legal_changed": 0.26237,
+   "n_word_added": 0.10298,
+   "n_word_dropped": 0.00923,
+   "n_dup_word": 0.02866,
+   "n_domain": 0.03509,
+   "n_domain_concat": 0.02074,
+   "n_domain_initials": 0.00153,
+   "n_junk_prefix": 0.01012,
+   "n_bracket": 0.09736,
+   "n_leet": 0.01455,
+   "n_double_space": 0.10639,
+   "n_all_caps": 0.1628,
+   "n_lower": 0.05309,
+   "a_empty": 0.03825,
+   "a_null_token": 0.02283,
+   "a_all_caps": 0.23601,
+   "a_pobox_added": 0.0,
+   "a_landmark": 0.11036,
+   "a_reorder": 0.04088,
+   "a_tokens_subset": 0.20656,
+   "num_s1_has": 0.91276,
+   "num_equal": 0.61055,
+   "num_overlap": 0.83499,
+   "num_rec_missing_all": 0.04295,
+   "num_added": 0.23591,
+   "num_truncated": 0.04316,
+   "state_same": 0.73519,
+   "state_diff": 0.0126,
+   "n_latin": 0.76735,
+   "n_unrelated": 0.01114,
+   "n_typo_like": 0.13572
+  },
+  "India|S3": {
+   "n_mixed_script": 0.01639,
+   "n_raw_eq": 0.02748,
+   "n_case_eq": 0.0667,
+   "n_norm_eq": 0.19959,
+   "n_core_eq": 0.45479,
+   "n_core_set_eq": 0.46406,
+   "n_reorder": 0.04969,
+   "n_legal_changed": 0.2543,
+   "n_word_added": 0.14404,
+   "n_word_dropped": 0.01896,
+   "n_dup_word": 0.02856,
+   "n_domain": 0.03701,
+   "n_domain_concat": 0.02179,
+   "n_domain_initials": 0.00164,
+   "n_junk_prefix": 0.01057,
+   "n_bracket": 0.10169,
+   "n_leet": 0.01557,
+   "n_double_space": 0.10849,
+   "n_all_caps": 0.02762,
+   "n_lower": 0.06121,
+   "a_empty": 0.04018,
+   "a_null_token": 0.02065,
+   "a_all_caps": 0.00036,
+   "a_pobox_added": 0.0,
+   "a_landmark": 0.08462,
+   "a_reorder": 0.01766,
+   "a_tokens_subset": 0.00355,
+   "num_s1_has": 0.91289,
+   "num_equal": 0.56409,
+   "num_overlap": 0.81742,
+   "num_rec_missing_all": 0.05666,
+   "num_added": 0.21417,
+   "num_truncated": 0.03897,
+   "state_same": 0.74785,
+   "state_diff": 0.01262,
+   "n_latin": 0.86906,
+   "n_unrelated": 0.02968,
+   "n_typo_like": 0.14061
+  },
+  "US|S2": {
+   "n_mixed_script": 0.0,
+   "n_raw_eq": 0.06103,
+   "n_case_eq": 0.14147,
+   "n_norm_eq": 0.30499,
+   "n_core_eq": 0.56437,
+   "n_core_set_eq": 0.59923,
+   "n_reorder": 0.06169,
+   "n_legal_changed": 0.25937,
+   "n_word_added": 0.04159,
+   "n_word_dropped": 0.07308,
+   "n_dup_word": 0.05456,
+   "n_domain": 0.05091,
+   "n_domain_concat": 0.02486,
+   "n_domain_initials": 0.00267,
+   "n_junk_prefix": 0.01474,
+   "n_bracket": 0.06878,
+   "n_leet": 0.02113,
+   "n_double_space": 0.12268,
+   "n_all_caps": 0.23413,
+   "n_lower": 0.0792,
+   "a_empty": 0.04905,
+   "a_null_token": 0.02863,
+   "a_all_caps": 0.88661,
+   "a_pobox_added": 0.03241,
+   "a_landmark": 7e-05,
+   "a_reorder": 0.05866,
+   "a_tokens_subset": 0.07809,
+   "num_s1_has": 1.0,
+   "num_equal": 0.57037,
+   "num_overlap": 0.76282,
+   "num_rec_missing_all": 0.13039,
+   "num_added": 0.19139,
+   "num_truncated": 0.05616,
+   "state_same": 0.94862,
+   "state_diff": 0.00233,
+   "n_latin": 1.0,
+   "n_unrelated": 0.01516,
+   "n_typo_like": 0.17928
+  },
+  "US|S3": {
+   "n_mixed_script": 0.0,
+   "n_raw_eq": 0.05754,
+   "n_case_eq": 0.13036,
+   "n_norm_eq": 0.30476,
+   "n_core_eq": 0.52122,
+   "n_core_set_eq": 0.55396,
+   "n_reorder": 0.05842,
+   "n_legal_changed": 0.21646,
+   "n_word_added": 0.0928,
+   "n_word_dropped": 0.07706,
+   "n_dup_word": 0.04998,
+   "n_domain": 0.04792,
+   "n_domain_concat": 0.02352,
+   "n_domain_initials": 0.00254,
+   "n_junk_prefix": 0.01368,
+   "n_bracket": 0.06848,
+   "n_leet": 0.02076,
+   "n_double_space": 0.11387,
+   "n_all_caps": 0.03206,
+   "n_lower": 0.07975,
+   "a_empty": 0.04582,
+   "a_null_token": 0.02683,
+   "a_all_caps": 0.0,
+   "a_pobox_added": 0.03007,
+   "a_landmark": 8e-05,
+   "a_reorder": 0.01957,
+   "a_tokens_subset": 0.00199,
+   "num_s1_has": 1.0,
+   "num_equal": 0.66421,
+   "num_overlap": 0.79733,
+   "num_rec_missing_all": 0.11378,
+   "num_added": 0.17944,
+   "num_truncated": 0.05332,
+   "state_same": 0.95199,
+   "state_diff": 0.0022,
+   "n_latin": 1.0,
+   "n_unrelated": 0.01695,
+   "n_typo_like": 0.17039
+  },
+  "ALL|ALL": {
+   "n_mixed_script": 0.00528,
+   "n_raw_eq": 0.04636,
+   "n_case_eq": 0.10749,
+   "n_norm_eq": 0.25787,
+   "n_core_eq": 0.50378,
+   "n_core_set_eq": 0.5279,
+   "n_reorder": 0.05593,
+   "n_legal_changed": 0.24562,
+   "n_word_added": 0.09053,
+   "n_word_dropped": 0.05075,
+   "n_dup_word": 0.04274,
+   "n_domain": 0.04405,
+   "n_domain_concat": 0.02301,
+   "n_domain_initials": 0.00219,
+   "n_junk_prefix": 0.01265,
+   "n_bracket": 0.08103,
+   "n_leet": 0.01859,
+   "n_double_space": 0.11386,
+   "n_all_caps": 0.11503,
+   "n_lower": 0.07059,
+   "a_empty": 0.04412,
+   "a_null_token": 0.0253,
+   "a_all_caps": 0.3027,
+   "a_pobox_added": 0.0187,
+   "a_landmark": 0.03893,
+   "a_reorder": 0.03463,
+   "a_tokens_subset": 0.06401,
+   "num_s1_has": 0.96508,
+   "num_equal": 0.60592,
+   "num_overlap": 0.79878,
+   "num_rec_missing_all": 0.09306,
+   "num_added": 0.20103,
+   "num_truncated": 0.04921,
+   "state_same": 0.86678,
+   "state_diff": 0.0064,
+   "n_latin": 0.92783,
+   "n_unrelated": 0.01794,
+   "n_typo_like": 0.16009
+  }
+ },
+ "script_share": {
+  "India|S2": {
+   "Bengali": 0.0151,
+   "Devanagari": 0.132,
+   "Gujarati": 0.0152,
+   "Gurmukhi": 0.0033,
+   "Kannada": 0.0182,
+   "Latin": 0.7674,
+   "Malayalam": 0.0093,
+   "Odia": 0.0036,
+   "Tamil": 0.0166,
+   "Telugu": 0.0193
+  },
+  "India|S3": {
+   "Bengali": 0.0086,
+   "Devanagari": 0.0743,
+   "Gujarati": 0.0085,
+   "Gurmukhi": 0.0019,
+   "Kannada": 0.0104,
+   "Latin": 0.8691,
+   "Malayalam": 0.0052,
+   "Odia": 0.0021,
+   "Tamil": 0.0093,
+   "Telugu": 0.0108
+  },
+  "US|S2": {
+   "Bengali": 0.0,
+   "Devanagari": 0.0,
+   "Gujarati": 0.0,
+   "Gurmukhi": 0.0,
+   "Kannada": 0.0,
+   "Latin": 1.0,
+   "Malayalam": 0.0,
+   "Odia": 0.0,
+   "Tamil": 0.0,
+   "Telugu": 0.0
+  },
+  "US|S3": {
+   "Bengali": 0.0,
+   "Devanagari": 0.0,
+   "Gujarati": 0.0,
+   "Gurmukhi": 0.0,
+   "Kannada": 0.0,
+   "Latin": 1.0,
+   "Malayalam": 0.0,
+   "Odia": 0.0,
+   "Tamil": 0.0,
+   "Telugu": 0.0
+  }
+ },
+ "state_forms": {
+  "India": {
+   "s1": {
+    "name": 0.9987,
+    "code": 0.0013
+   },
+   "rec": {
+    "name": 0.4521,
+    "code": 0.3022,
+    "native": 0.199,
+    "NaN": 0.0467
+   }
+  },
+  "US": {
+   "s1": {
+    "code": 0.9931,
+    "name": 0.0069
+   },
+   "rec": {
+    "code": 0.4895,
+    "name": 0.4631,
+    "NaN": 0.0474
+   }
+  }
+ },
+ "new_tokens_hist": {
+  "0": 0.2371,
+  "1": 0.3326,
+  "2": 0.2404,
+  "3": 0.1222,
+  "4": 0.0483,
+  "5": 0.0146,
+  "6": 0.0047
+ },
+ "dropped_tokens_hist": {
+  "0": 0.1743,
+  "1": 0.2954,
+  "2": 0.2457,
+  "3": 0.1151,
+  "4": 0.0459,
+  "5": 0.0341,
+  "6": 0.021,
+  "7": 0.0158,
+  "8": 0.0528
+ },
+ "sim_quantiles_by_country_src": {
+  "India|S2": {
+   "n_tsr_raw": [
+    6.8,
+    8.7,
+    9.5,
+    46.5,
+    93.5
+   ],
+   "n_tsr": [
+    26.7,
+    42.9,
+    51.3,
+    67.9,
+    100.0
+   ],
+   "n_tsort": [
+    26.1,
+    40.0,
+    48.6,
+    64.7,
+    91.4
+   ],
+   "n_ratio": [
+    30.0,
+    45.5,
+    52.6,
+    66.7,
+    90.9
+   ],
+   "n_partial": [
+    42.9,
+    59.5,
+    66.7,
+    81.2,
+    100.0
+   ],
+   "n_jw": [
+    49.5,
+    61.1,
+    66.5,
+    82.8,
+    95.3
+   ],
+   "n_skel_ratio": [
+    28.6,
+    47.1,
+    55.6,
+    71.4,
+    92.3
+   ],
+   "a_tsr_raw": [
+    69.30000305175781,
+    82.9000015258789,
+    87.5,
+    93.0999984741211,
+    100.0
+   ],
+   "a_tsr": [
+    71.9000015258789,
+    85.69999694824219,
+    89.9000015258789,
+    94.9000015258789,
+    100.0
+   ],
+   "a_tsort": [
+    44.29999923706055,
+    59.79999923706055,
+    74.30000305175781,
+    87.0999984741211,
+    92.5999984741211
+   ],
+   "a_partial": [
+    58.29999923706055,
+    68.19999694824219,
+    74.19999694824219,
+    85.0999984741211,
+    92.5
+   ],
+   "n": 1480545
+  },
+  "India|S3": {
+   "n_tsr_raw": [
+    7.5,
+    9.4,
+    11.5,
+    81.6,
+    97.2
+   ],
+   "n_tsr": [
+    19.0,
+    42.1,
+    53.8,
+    78.9,
+    100.0
+   ],
+   "n_tsort": [
+    19.0,
+    38.1,
+    50.0,
+    68.2,
+    92.9
+   ],
+   "n_ratio": [
+    20.7,
+    43.2,
+    53.7,
+    71.0,
+    92.3
+   ],
+   "n_partial": [
+    33.3,
+    60.0,
+    69.2,
+    86.7,
+    100.0
+   ],
+   "n_jw": [
+    42.2,
+    56.3,
+    66.1,
+    84.1,
+    96.2
+   ],
+   "n_skel_ratio": [
+    18.2,
+    43.5,
+    54.5,
+    72.7,
+    93.3
+   ],
+   "a_tsr_raw": [
+    53.79999923706055,
+    70.4000015258789,
+    78.5999984741211,
+    88.19999694824219,
+    93.9000015258789
+   ],
+   "a_tsr": [
+    55.599998474121094,
+    71.4000015258789,
+    80.0,
+    89.4000015258789,
+    94.69999694824219
+   ],
+   "a_tsort": [
+    30.100000381469727,
+    40.0,
+    47.20000076293945,
+    66.69999694824219,
+    87.19999694824219
+   ],
+   "a_partial": [
+    52.400001525878906,
+    60.5,
+    65.4000015258789,
+    75.0,
+    87.0999984741211
+   ],
+   "n": 1579298
+  },
+  "US|S2": {
+   "n_tsr_raw": [
+    25.0,
+    60.0,
+    78.3,
+    92.7,
+    100.0
+   ],
+   "n_tsr": [
+    25.8,
+    59.6,
+    76.9,
+    94.9,
+    100.0
+   ],
+   "n_tsort": [
+    25.0,
+    54.1,
+    66.7,
+    85.7,
+    100.0
+   ],
+   "n_ratio": [
+    26.1,
+    60.9,
+    70.0,
+    84.6,
+    100.0
+   ],
+   "n_partial": [
+    40.0,
+    73.7,
+    81.8,
+    94.1,
+    100.0
+   ],
+   "n_jw": [
+    48.7,
+    81.0,
+    88.0,
+    93.4,
+    100.0
+   ],
+   "n_skel_ratio": [
+    26.7,
+    58.8,
+    69.6,
+    85.7,
+    100.0
+   ],
+   "a_tsr_raw": [
+    64.4000015258789,
+    75.69999694824219,
+    82.5999984741211,
+    90.9000015258789,
+    95.19999694824219
+   ],
+   "a_tsr": [
+    64.4000015258789,
+    75.69999694824219,
+    82.5999984741211,
+    90.9000015258789,
+    95.19999694824219
+   ],
+   "a_tsort": [
+    56.29999923706055,
+    67.69999694824219,
+    75.0,
+    84.5,
+    92.80000305175781
+   ],
+   "a_partial": [
+    60.5,
+    66.69999694824219,
+    69.80000305175781,
+    76.5,
+    87.0999984741211
+   ],
+   "n": 2213074
+  },
+  "US|S3": {
+   "n_tsr_raw": [
+    23.5,
+    60.0,
+    78.6,
+    93.3,
+    100.0
+   ],
+   "n_tsr": [
+    24.2,
+    59.5,
+    77.4,
+    95.5,
+    100.0
+   ],
+   "n_tsort": [
+    23.5,
+    50.0,
+    62.2,
+    80.6,
+    100.0
+   ],
+   "n_ratio": [
+    24.2,
+    56.0,
+    66.7,
+    80.0,
+    100.0
+   ],
+   "n_partial": [
+    40.0,
+    73.3,
+    82.1,
+    94.4,
+    100.0
+   ],
+   "n_jw": [
+    44.6,
+    66.1,
+    80.5,
+    92.1,
+    100.0
+   ],
+   "n_skel_ratio": [
+    23.5,
+    54.5,
+    66.7,
+    81.5,
+    100.0
+   ],
+   "a_tsr_raw": [
+    57.5,
+    68.4000015258789,
+    74.5,
+    82.0999984741211,
+    87.9000015258789
+   ],
+   "a_tsr": [
+    57.5,
+    68.4000015258789,
+    74.5,
+    82.0999984741211,
+    87.9000015258789
+   ],
+   "a_tsort": [
+    53.70000076293945,
+    64.0999984741211,
+    70.19999694824219,
+    78.30000305175781,
+    85.0
+   ],
+   "a_partial": [
+    56.20000076293945,
+    63.20000076293945,
+    67.5999984741211,
+    76.9000015258789,
+    90.19999694824219
+   ],
+   "n": 2365448
+  }
+ },
+ "sim_quantiles_by_name_script": {
+  "Bengali": {
+   "n_tsr_raw": [
+    5.3,
+    7.0,
+    8.0,
+    8.8,
+    9.8
+   ],
+   "n_tsr": [
+    27.8,
+    35.3,
+    40.0,
+    48.3,
+    57.1
+   ],
+   "n_skel_ratio": [
+    33.3,
+    44.4,
+    50.0,
+    58.3,
+    66.7
+   ],
+   "a_tsr": [
+    56.400001525878906,
+    75.0,
+    81.5999984741211,
+    89.0999984741211,
+    95.0
+   ],
+   "n": 35910
+  },
+  "Devanagari": {
+   "n_tsr_raw": [
+    5.6,
+    7.3,
+    8.2,
+    9.1,
+    10.0
+   ],
+   "n_tsr": [
+    27.8,
+    35.9,
+    41.2,
+    50.0,
+    59.1
+   ],
+   "n_skel_ratio": [
+    31.6,
+    41.7,
+    46.2,
+    55.6,
+    66.7
+   ],
+   "a_tsr": [
+    60.0,
+    75.4000015258789,
+    83.0,
+    92.0999984741211,
+    97.5999984741211
+   ],
+   "n": 312725
+  },
+  "Gujarati": {
+   "n_tsr_raw": [
+    5.4,
+    7.1,
+    8.0,
+    9.0,
+    10.0
+   ],
+   "n_tsr": [
+    30.8,
+    40.0,
+    44.4,
+    53.8,
+    61.5
+   ],
+   "n_skel_ratio": [
+    36.4,
+    47.1,
+    52.6,
+    60.9,
+    70.0
+   ],
+   "a_tsr": [
+    59.29999923706055,
+    75.9000015258789,
+    83.0999984741211,
+    92.30000305175781,
+    97.5999984741211
+   ],
+   "n": 35819
+  },
+  "Gurmukhi": {
+   "n_tsr_raw": [
+    5.7,
+    7.4,
+    8.5,
+    9.3,
+    10.3
+   ],
+   "n_tsr": [
+    24.2,
+    31.1,
+    34.6,
+    40.0,
+    48.0
+   ],
+   "n_skel_ratio": [
+    25.0,
+    33.3,
+    38.5,
+    46.7,
+    56.0
+   ],
+   "a_tsr": [
+    62.099998474121094,
+    78.5999984741211,
+    85.30000305175781,
+    92.69999694824219,
+    97.0999984741211
+   ],
+   "n": 7924
+  },
+  "Kannada": {
+   "n_tsr_raw": [
+    5.0,
+    6.7,
+    7.5,
+    8.2,
+    9.1
+   ],
+   "n_tsr": [
+    29.6,
+    37.8,
+    42.9,
+    51.6,
+    60.0
+   ],
+   "n_skel_ratio": [
+    33.3,
+    44.4,
+    50.0,
+    58.8,
+    66.7
+   ],
+   "a_tsr": [
+    57.70000076293945,
+    73.0999984741211,
+    81.0999984741211,
+    91.19999694824219,
+    96.9000015258789
+   ],
+   "n": 43379
+  },
+  "Latin": {
+   "n_tsr_raw": [
+    22.2,
+    56.4,
+    76.9,
+    91.8,
+    100.0
+   ],
+   "n_tsr": [
+    23.1,
+    57.1,
+    73.7,
+    94.7,
+    100.0
+   ],
+   "n_skel_ratio": [
+    22.2,
+    54.5,
+    66.7,
+    83.3,
+    100.0
+   ],
+   "a_tsr": [
+    60.0,
+    72.69999694824219,
+    79.0999984741211,
+    87.19999694824219,
+    94.30000305175781
+   ],
+   "n": 7087125
+  },
+  "Malayalam": {
+   "n_tsr_raw": [
+    5.1,
+    6.9,
+    7.5,
+    8.3,
+    9.1
+   ],
+   "n_tsr": [
+    23.5,
+    30.4,
+    34.1,
+    41.0,
+    48.5
+   ],
+   "n_skel_ratio": [
+    23.5,
+    33.3,
+    37.5,
+    45.5,
+    54.5
+   ],
+   "a_tsr": [
+    65.0,
+    78.0,
+    84.19999694824219,
+    92.0999984741211,
+    97.0999984741211
+   ],
+   "n": 21930
+  },
+  "Odia": {
+   "n_tsr_raw": [
+    5.3,
+    6.8,
+    7.7,
+    8.5,
+    9.4
+   ],
+   "n_tsr": [
+    27.0,
+    36.4,
+    41.9,
+    51.3,
+    60.0
+   ],
+   "n_skel_ratio": [
+    33.3,
+    44.4,
+    50.0,
+    58.8,
+    66.7
+   ],
+   "a_tsr": [
+    64.80000305175781,
+    77.69999694824219,
+    82.9000015258789,
+    89.9000015258789,
+    94.5999984741211
+   ],
+   "n": 8681
+  },
+  "Tamil": {
+   "n_tsr_raw": [
+    5.1,
+    6.7,
+    7.5,
+    8.5,
+    9.4
+   ],
+   "n_tsr": [
+    20.0,
+    26.1,
+    29.4,
+    35.6,
+    42.6
+   ],
+   "n_skel_ratio": [
+    15.4,
+    28.6,
+    33.3,
+    42.1,
+    52.6
+   ],
+   "a_tsr": [
+    56.70000076293945,
+    73.0999984741211,
+    81.0999984741211,
+    90.19999694824219,
+    95.5999984741211
+   ],
+   "n": 39252
+  },
+  "Telugu": {
+   "n_tsr_raw": [
+    5.3,
+    6.9,
+    7.7,
+    8.5,
+    9.4
+   ],
+   "n_tsr": [
+    29.6,
+    37.5,
+    42.9,
+    51.3,
+    59.5
+   ],
+   "n_skel_ratio": [
+    33.3,
+    44.4,
+    50.0,
+    58.3,
+    66.7
+   ],
+   "a_tsr": [
+    58.599998474121094,
+    72.30000305175781,
+    80.0,
+    89.5,
+    95.5
+   ],
+   "n": 45620
+  }
+ },
+ "sim_quantiles_by_category": {
+  "domain_name": {
+   "n_tsr": [
+    32.0,
+    42.1,
+    46.7,
+    52.6,
+    62.5
+   ],
+   "a_tsr": [
+    60.0,
+    72.19999694824219,
+    78.5,
+    86.5999984741211,
+    93.9000015258789
+   ],
+   "n": 336435
+  },
+  "empty_address": {
+   "n_tsr": [
+    59.3,
+    77.4,
+    85.7,
+    100.0,
+    100.0
+   ],
+   "a_tsr": [
+    NaN,
+    NaN,
+    NaN,
+    NaN,
+    NaN
+   ],
+   "n": 335810
+  },
+  "indic_name": {
+   "n_tsr": [
+    26.1,
+    34.3,
+    38.9,
+    48.0,
+    57.9
+   ],
+   "a_tsr": [
+    59.5,
+    75.0,
+    82.4000015258789,
+    91.30000305175781,
+    97.0999984741211
+   ],
+   "n": 551240
+  },
+  "name_exact_norm": {
+   "n_tsr": [
+    100.0,
+    100.0,
+    100.0,
+    100.0,
+    100.0
+   ],
+   "a_tsr": [
+    59.7,
+    72.0,
+    78.3,
+    86.3,
+    93.6
+   ],
+   "n": 1863516
+  },
+  "other": {
+   "n_tsr": [
+    50.0,
+    66.7,
+    78.8,
+    93.0,
+    100.0
+   ],
+   "a_tsr": [
+    60.3,
+    73.1,
+    79.4,
+    87.5,
+    94.5
+   ],
+   "n": 4414349
+  },
+  "unrelated_name": {
+   "n_tsr": [
+    0.0,
+    10.0,
+    12.9,
+    17.4,
+    23.1
+   ],
+   "a_tsr": [
+    61.5,
+    74.5999984741211,
+    81.0,
+    89.4000015258789,
+    96.4000015258789
+   ],
+   "n": 137015
+  }
+ },
+ "category_share": {
+  "other": 0.5779,
+  "name_exact_norm": 0.244,
+  "indic_name": 0.0722,
+  "domain_name": 0.044,
+  "empty_address": 0.044,
+  "unrelated_name": 0.0179
+ },
+ "weak_name_pairs": {
+  "share": 0.049621875885742565,
+  "addr_tsr_quantiles": [
+   74.0999984741211,
+   80.9000015258789,
+   89.5999984741211,
+   95.9000015258789
+  ],
+  "addr_empty_share": 0.002181885338891381,
+  "num_overlap_share": 0.8455452075033638
+ },
+ "both_weak_share": 0.0005725047179599299,
+ "both_weak_examples": [
+  {
+   "country": "India",
+   "src": "S3",
+   "n1_n": "taraesh strips llp",
+   "n2_n": "miraecto",
+   "a1_n": "a 2205 oberoi sky garden city dattapada road borivali east mumbai maharashtra",
+   "a2_n": "h no 548 a 2205 greater bombay mumbai \u092e\u0939\u093e\u0930\u093e\u0937\u094d\u091f\u094d\u0930"
+  },
+  {
+   "country": "US",
+   "src": "S2",
+   "n1_n": "st fellowship corp",
+   "n2_n": "st corp center",
+   "a1_n": "21 sherwood drive augusta me",
+   "a2_n": ""
+  },
+  {
+   "country": "India",
+   "src": "S2",
+   "n1_n": "jay systems limited",
+   "n2_n": "onyxmirabrix www onyxmirabr com",
+   "a1_n": "gorakhpur uttar pradesh 313e wazirabad colony near masjid gorakhnath gorakhpur",
+   "a2_n": "plot 714 313e gorakhpur \u0909\u0924\u094d\u0924\u0930 \u092a\u094d\u0930\u0926\u0947\u0936"
+  },
+  {
+   "country": "US",
+   "src": "S3",
+   "n1_n": "d 2 m shore llc",
+   "n2_n": "d2m com",
+   "a1_n": "2145 dixie highway unit 3 lima oh",
+   "a2_n": "dixie hwy 3 bath twp ohio"
+  },
+  {
+   "country": "US",
+   "src": "S2",
+   "n1_n": "bradley superior media",
+   "n2_n": "bsmedia com",
+   "a1_n": "1230 1130 sparta ky",
+   "a2_n": "8230 1130 gallatin county ky"
+  },
+  {
+   "country": "India",
+   "src": "S3",
+   "n1_n": "lotus food private limited",
+   "n2_n": "\u09b2\u09c7\u09be\u099f\u09be\u09b8 \u09ab\u09c1\u09a1 \u09aa\u09cd\u09b0\u09be\u0987\u09ad\u09c7\u099f \u09b2\u09bf\u09ae\u09bf\u099f\u09c7\u09a1",
+   "a1_n": "5 2 h 44 bhukailash road kolkata kolkata howrah west bengal",
+   "a2_n": "hn 393 5 2 h 44 north 24 pargana \u09aa\u09b6\u09cd\u099a\u09bf\u09ae\u09ac\u0999\u09cd\u0997"
+  },
+  {
+   "country": "India",
+   "src": "S2",
+   "n1_n": "bright foundation private limited",
+   "n2_n": "\u0a2c\u0a4d\u0a30\u0a3e\u0a08\u0a1f \u0a2b\u0a3e\u0a0a\u0a02\u0a21\u0a47\u0a38\u0a3c\u0a28 \u0a2a\u0a4d\u0a30\u0a3e\u0a08\u0a35\u0a47\u0a1f \u0a32\u0a3f\u0a2e\u0a1f\u0a3f\u0a21",
+   "a1_n": "403 4th floor tower no 23 royal estate rajpura mohali punjab",
+   "a2_n": "mushalla punjab door no 203"
+  },
+  {
+   "country": "US",
+   "src": "S3",
+   "n1_n": "stanish mercator",
+   "n2_n": "stanishmercatorcom",
+   "a1_n": "4159 shore drive bethel ny",
+   "a2_n": "4159 shore dr kauneonga lake new york"
+  },
+  {
+   "country": "US",
+   "src": "S3",
+   "n1_n": "fr gamco",
+   "n2_n": "fr services",
+   "a1_n": "10828 fillmore street avondale az",
+   "a2_n": ""
+  },
+  {
+   "country": "India",
+   "src": "S3",
+   "n1_n": "international royal international private limited",
+   "n2_n": "\u0c07\u0c02\u0c1f\u0c30\u0c4d\u0c28\u0c47\u0c37\u0c28\u0c32\u0c4d \u0c30\u0c3e\u0c2f\u0c32\u0c4d \u0c07\u0c02\u0c1f\u0c30\u0c4d\u0c28\u0c47\u0c37\u0c28\u0c32\u0c4d \u0c2a\u0c4d\u0c30\u0c46\u0c56\u0c35\u0c47\u0c1f\u0c4d \u0c32\u0c3f\u0c2e\u0c3f\u0c1f\u0c46\u0c21\u0c4d",
+   "a1_n": "h no 12 4 18 sri sarada nilayam narasaraopet guntur andhra pradesh",
+   "a2_n": "hn 952 h no 12 4 18 n a narasaraopeta ap"
+  },
+  {
+   "country": "India",
+   "src": "S2",
+   "n1_n": "new ventures private limited",
+   "n2_n": "\u0928\u094d\u092f\u0942 \u0935\u0947\u0902\u091a\u0930\u094d\u0938 \u092a\u094d\u0930\u093e\u0907\u0935\u0947\u091f \u0932\u093f\u092e\u093f\u091f\u0947\u0921",
+   "a1_n": "1002 joy white house plot no 79 a shree shyam smruti chsl tagore road santacruz wes t mumbai maharashtra",
+   "a2_n": "1002 mumbai suburban \u092e\u0939\u093e\u0930\u093e\u0937\u094d\u091f\u094d\u0930"
+  },
+  {
+   "country": "India",
+   "src": "S3",
+   "n1_n": "urban estate private limited",
+   "n2_n": "\u0c05\u0c30\u0c4d\u0c2c\u0c28\u0c4d \u0c0e\u0c38\u0c4d\u0c1f\u0c47\u0c1f\u0c4d \u0c2a\u0c4d\u0c30\u0c46\u0c56\u0c35\u0c47\u0c1f\u0c4d \u0c32\u0c3f\u0c2e\u0c3f\u0c1f\u0c46\u0c21\u0c4d",
+   "a1_n": "1 5 501 31 ayyappa nagar colony father balaiahnagar div 13 hyderabad telangana",
+   "a2_n": "no 976 1 5 501 31 medchal malkajgiri tg"
+  },
+  {
+   "country": "India",
+   "src": "S3",
+   "n1_n": "south impex private limited",
+   "n2_n": "\u0d38\u0d57\u0d24\u0d4d\u0d24\u0d4d \u0d07\u0d02\u0d2a\u0d46\u0d15\u0d4d\u0d38\u0d4d \u0d2a\u0d4d\u0d30\u0d48\u0d35\u0d31\u0d4d\u0d31\u0d4d \u0d32\u0d3f\u0d2e\u0d3f\u0d31\u0d4d\u0d31\u0d21\u0d4d",
+   "a1_n": "ernakulam no 41 651 a 2 kanjirakkatt near oberon mall ernakulam kerala",
+   "a2_n": "no 216 ernakulam n h bye pass vennala kochi kl"
+  },
+  {
+   "country": "India",
+   "src": "S3",
+   "n1_n": "hitech foundation pvt ltd",
+   "n2_n": "\u0939\u093e\u0908\u091f\u0947\u0915 \u092b\u093e\u0909\u0902\u0921\u0947\u0936\u0928 \u092a\u094d\u0930\u093e \u0932\u093f",
+   "a1_n": "118 8 4th floor maruti plaza sanjay place agra uttar pradesh",
+   "a2_n": "18 8 agra \u0909\u0924\u094d\u0924\u0930 \u092a\u094d\u0930\u0926\u0947\u0936"
+  },
+  {
+   "country": "US",
+   "src": "S3",
+   "n1_n": "palma caro d d s m d p c",
+   "n2_n": "brixdelta",
+   "a1_n": "126 laurel house worcester township pa",
+   "a2_n": "laurel house lasdale pennsylvania"
+  },
+  {
+   "country": "India",
+   "src": "S3",
+   "n1_n": "perfect engineering private limited",
+   "n2_n": "\u092a\u0930\u092b\u0947\u0915\u094d\u091f \u0907\u0902\u091c\u0940\u0928\u093f\u092f\u0930\u093f\u0902\u0917 \u092a\u094d\u0930\u093e\u0907\u0935\u0947\u091f \u0932\u093f\u092e\u093f\u091f\u0947\u0921",
+   "a1_n": "36 hare krishna sion trombay road opp maitri park chembur mumbai mumbai city maharashtra",
+   "a2_n": "door no 880 36 mumbai north mumbai city mh"
+  },
+  {
+   "country": "India",
+   "src": "S3",
+   "n1_n": "efl dry private limited",
+   "n2_n": "efldry",
+   "a1_n": "404 suryaarked nearbankofbaroda panchnath 1 12corner rajkot gujarat",
+   "a2_n": "40 ahmedabad gj"
+  },
+  {
+   "country": "India",
+   "src": "S2",
+   "n1_n": "creative engineering private limited",
+   "n2_n": "\u0a95\u0acd\u0ab0\u0abf\u0a8f\u0a9f\u0abf\u0ab5 \u0a8f\u0aa8\u0acd\u0a9c\u0abf\u0aa8\u0abf\u0aaf\u0ab0\u0abf\u0a82\u0a97 \u0aaa\u0acd\u0ab0\u0abe\u0a87\u0ab5\u0ac7\u0a9f \u0ab2\u0abf\u0aae\u0abf\u0a9f\u0ac7\u0aa1",
+   "a1_n": "upleta tulshi complex tagor road shop no 37 rajkot gujarat",
+   "a2_n": "door no 37 upleta junagadh \u0a97\u0ac1\u0a9c\u0ab0\u0abe\u0aa4"
+  },
+  {
+   "country": "US",
+   "src": "S3",
+   "n1_n": "interstate signature banco inc",
+   "n2_n": "calonyladova",
+   "a1_n": "6105 upton avenue town of angelo wi",
+   "a2_n": "6105 upton ave sparta wisconsin"
+  },
+  {
+   "country": "US",
+   "src": "S3",
+   "n1_n": "superior textile dynamics inc",
+   "n2_n": "calodrex",
+   "a1_n": "15450 29th avenue phoenix az",
+   "a2_n": "shaw butte arizona 1545 29rd ave"
+  },
+  {
+   "country": "India",
+   "src": "S2",
+   "n1_n": "ct navigators partners",
+   "n2_n": "noviumbra",
+   "a1_n": "23 siva arcode 2nd floor 29th main btm layout 1st stage bangalore karnataka",
+   "a2_n": "door no 023 bangalore \u0c95\u0cb0\u0ccd\u0ca8\u0cbe\u0c9f\u0c95"
+  },
+  {
+   "country": "US",
+   "src": "S3",
+   "n1_n": "o 5 o catalyst inc",
+   "n2_n": "o5o com",
+   "a1_n": "11234 tomi drive phoenix az",
+   "a2_n": "11234 tomi dr ahwatukee arizona"
+  },
+  {
+   "country": "US",
+   "src": "S3",
+   "n1_n": "campbell grand series llc",
+   "n2_n": "ciralyra",
+   "a1_n": "ok 16935 1450 road vinson",
+   "a2_n": "016935 1450 rd harmon county oklahoma"
+  },
+  {
+   "country": "India",
+   "src": "S3",
+   "n1_n": "new consultancy private limited",
+   "n2_n": "\u0928\u094d\u092f\u0942 \u0915\u0902\u0938\u0932\u094d\u091f\u0947\u0902\u0938\u0940 private limited",
+   "a1_n": "c 43 himalya house 23 kg marg connaught place new delhi central delhi delhi",
+   "a2_n": "h no 184 c 43 dl sahibabad new delhi"
+  },
+  {
+   "country": "India",
+   "src": "S3",
+   "n1_n": "ss products private limited",
+   "n2_n": "\u0c0e\u0c38\u0c4d \u0c0e\u0c38\u0c4d \u0c2a\u0c4d\u0c30\u0c4a\u0c21\u0c15\u0c4d\u0c1f\u0c4d\u0c38\u0c4d \u0c2a\u0c4d\u0c30\u0c46\u0c56\u0c35\u0c47\u0c1f\u0c4d \u0c32\u0c3f\u0c2e\u0c3f\u0c1f\u0c46\u0c21\u0c4d",
+   "a1_n": "8e2 krishna nagar revenue ward no 76 kurnool andhra pradesh",
+   "a2_n": "no 008e2 kurnool alur ap"
+  }
+ ],
+ "cluster": {
+  "share_all_matches_easy(n_tsr>=80&a_tsr>=80)": 0.42663279537947774,
+  "share_with_indic_match": 0.13109013646743528,
+  "share_with_empty_addr_match": 0.15003066845717983,
+  "share_with_unrelated_name_match": 0.06379423049049374,
+  "share_with_domain_match": 0.14975949978258513,
+  "min_n_tsr_quantiles": [
+   28.6,
+   43.8,
+   60.9,
+   84.2
+  ],
+  "min_a_tsr_quantiles": [
+   64.5,
+   70.80000305175781,
+   80.0,
+   87.0999984741211
+  ],
+  "s2_s3_joint": {
+   "0": {
+    "0": 0,
+    "1": 58750,
+    "2": 48490,
+    "3": 25037,
+    "4": 8898,
+    "5": 1854
+   },
+   "1": {
+    "0": 60407,
+    "1": 269681,
+    "2": 223054,
+    "3": 114405,
+    "4": 40618,
+    "5": 8252
+   },
+   "2": {
+    "0": 57041,
+    "1": 251224,
+    "2": 208159,
+    "3": 105817,
+    "4": 38338,
+    "5": 7796
+   },
+   "3": {
+    "0": 31526,
+    "1": 140393,
+    "2": 116076,
+    "3": 59427,
+    "4": 20852,
+    "5": 4169
+   },
+   "4": {
+    "0": 12260,
+    "1": 54575,
+    "2": 45167,
+    "3": 23315,
+    "4": 8131,
+    "5": 1668
+   },
+   "5": {
+    "0": 3017,
+    "1": 13437,
+    "2": 10957,
+    "3": 5504,
+    "4": 2085,
+    "5": 378
+   },
+   "6": {
+    "0": 247,
+    "1": 1048,
+    "2": 876,
+    "3": 452,
+    "4": 156,
+    "5": 37
+   }
+  }
+ },
+ "within_source_dups": {
+  "n_pairs": 2354096,
+  "name_tsr_quantiles": [
+   51.6,
+   73.2,
+   97.3
+  ],
+  "addr_tsr_quantiles": [
+   68.9,
+   91.9,
+   97.2
+  ],
+  "exact_same_name_and_addr": 0.06466856067042295
+ }
+}
