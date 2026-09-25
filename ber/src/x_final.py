@@ -24,6 +24,8 @@ i = np.flatnonzero(acc & fr)
 bad = np.array([bool((set(b.split()) - set(a.split())) & FR_WORDS)
                 for a, b in zip(n1.nn.values[d.sid.values[i]], n2.nn.values[d.rid.values[i]])])
 acc[i[bad]] = False
+if os.environ.get("FR_BLANK"):   # leaderboard probe: France left empty, so (best - probe) isolates France's score
+    acc[fr] = False
 print(f"thr {THR} / France {THR_FR}: accepted {acc.sum()}, France distractor-word rejects {bad.sum()}", flush=True)
 if OUT == "sweep":   # France no-match / matches-per-S1 after the word rule, per France threshold (US/India: 5.75% / 3.43)
     keep = np.ones(len(d), bool); keep[i[bad]] = False
