@@ -44,13 +44,16 @@ matcher and the reported score never see pairs the embedder was trained on.
 conda create -n amlc python=3.12 -y && conda activate amlc
 pip install -r requirements.txt   # or: torch sentence-transformers lightgbm rapidfuzz anyascii pandas pyarrow
 ```
-Base encoder `intfloat/multilingual-e5-small` is fetched from the Hugging Face Hub on first use; on an offline
-node, download it first and set `E5=/path/to/snapshot`.
+Base encoder `intfloat/multilingual-e5-small` (MIT licence) is fetched from the Hugging Face Hub on first use; on an
+offline node, download it first and set `E5=/path/to/local/model`.
 
-Data layout (`AMLC_ROOT` defaults to `~/scratch/AmazonMLChallenge`):
+Data: place (or symlink) the provided `student_resource/` folder next to `src/`, i.e. inside this folder:
 ```
-$AMLC_ROOT/student_resource/dataset/{train,test}/*.tsv
+business_entity_resolution/
+├── src/
+└── student_resource/dataset/{train,test}/*.tsv     # + utils/validate_submission.py
 ```
+To keep data elsewhere, set `AMLC_ROOT` to the folder that contains `student_resource/`.
 Caches, embeddings, models and logs go to `$AMLC_ROOT/work`; outputs to `$AMLC_ROOT/output` (override with `OUT=`).
 
 ### Run (from `src/`; one A100 80GB, ~32 cores, ~200 GB RAM)
@@ -64,11 +67,10 @@ python match.py train        # features, LightGBM, threshold on fold 9 (~20 min)
 python match.py test         # -> output/matching_results.tsv, output/candidate_pairs.tsv
 python match.py tune         # optional: re-sweep the threshold from cached fold-9 predictions
 ```
-Validate, then build the submission zip:
+Validate the outputs (run from this folder):
 ```bash
-cd $AMLC_ROOT/student_resource && python3 utils/validate_submission.py \
+cd student_resource && python3 utils/validate_submission.py \
   --matching ../output/matching_results.tsv --candidate ../output/candidate_pairs.tsv --test-dir dataset/test
-bash ber/package.sh <team_name>   # -> $AMLC_ROOT/submission/<team_name>_submission.zip
 ```
 
 No external data or lookup services are used at any stage.

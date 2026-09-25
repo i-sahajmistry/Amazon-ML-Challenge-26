@@ -2,7 +2,8 @@ import os, re, zlib
 import numpy as np, pandas as pd
 from anyascii import anyascii
 
-ROOT = os.path.expanduser(os.environ.get("AMLC_ROOT", "~/scratch/AmazonMLChallenge"))
+# default: the folder that contains src/ (put or symlink student_resource/ there), override with AMLC_ROOT
+ROOT = os.path.expanduser(os.environ.get("AMLC_ROOT", os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 DATA = f"{ROOT}/student_resource/dataset"
 WORK = f"{ROOT}/work"
 os.makedirs(WORK, exist_ok=True)

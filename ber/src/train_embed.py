@@ -6,7 +6,7 @@ from sentence_transformers import SentenceTransformer, SentenceTransformerTraine
 from sentence_transformers.training_args import BatchSamplers
 from common import load, s1_fold, embed_text, WORK
 
-BASE = os.environ.get("E5", os.path.expanduser("~/scratch/hf/hub/models--intfloat--multilingual-e5-small/snapshots/614241f622f53c4eeff9890bdc4f31cfecc418b3"))
+BASE = os.environ.get("E5", "intfloat/multilingual-e5-small")  # MIT licence; set E5=/local/path on offline nodes
 OUT = f"{WORK}/e5_ft"
 N_PER_S1 = int(os.environ.get("N_PER_S1", 2))  # pairs per S1 (distinct matches); each epoch-pass keeps S1 unique per batch mostly
 
