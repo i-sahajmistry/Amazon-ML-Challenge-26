@@ -39,28 +39,13 @@ _ADDR_ABBR = {  # US / India / France
     "fl": "floor", "flr": "floor", "bldg": "building", "no": "number", "nr": "near", "opp": "opposite",
     "r": "rue", "all": "allee", "chem": "chemin", "rte": "route", "imp": "impasse", "fbg": "faubourg",
     "n.": "north", "s.": "south", "e.": "east", "w.": "west", "ne": "northeast", "nw": "northwest",
-    "se": "southeast", "sw": "southwest", "mg": "mahatma gandhi",
+    "se": "southeast", "sw": "southwest",
 }
 _LEGAL = set("private limited llp llc incorporated corporation company plc pllc pc lp llp sarl sas sasu eurl sa sci snc "
              "the dba gmbh ltd pvt inc corp co and of "
              # transliterated Indic legal words (EDA §8) and French forms
              "praivet praibhet prayvet limitet limted lmtd elelpi elelpee ei ets etablissements cie".split())
 _JUNK = {"null", "none", "nan", "na"}
-_STATES = {  # expand abbreviations to full names so "TX" == "Texas"; open set, unknown tokens pass through
-    "al": "alabama", "ak": "alaska", "az": "arizona", "ar": "arkansas", "ca": "california", "co": "colorado",
-    "ct": "connecticut", "de": "delaware", "fl": "florida", "ga": "georgia", "hi": "hawaii", "id": "idaho",
-    "il": "illinois", "in": "indiana", "ia": "iowa", "ks": "kansas", "ky": "kentucky", "la": "louisiana",
-    "me": "maine", "md": "maryland", "ma": "massachusetts", "mi": "michigan", "mn": "minnesota", "ms": "mississippi",
-    "mo": "missouri", "mt": "montana", "ne": "nebraska", "nv": "nevada", "nh": "new hampshire", "nj": "new jersey",
-    "nm": "new mexico", "ny": "new york", "nc": "north carolina", "nd": "north dakota", "oh": "ohio",
-    "ok": "oklahoma", "or": "oregon", "pa": "pennsylvania", "ri": "rhode island", "sc": "south carolina",
-    "sd": "south dakota", "tn": "tennessee", "tx": "texas", "ut": "utah", "vt": "vermont", "va": "virginia",
-    "wa": "washington", "wv": "west virginia", "wi": "wisconsin", "wy": "wyoming", "dc": "district of columbia",
-    "up": "uttar pradesh", "mh": "maharashtra", "tn.": "tamil nadu", "ka": "karnataka", "kl": "kerala",
-    "wb": "west bengal", "mp": "madhya pradesh", "hr": "haryana", "pb": "punjab", "rj": "rajasthan",
-    "gj": "gujarat", "ap": "andhra pradesh", "ts": "telangana", "dl": "delhi", "br": "bihar", "or.": "odisha",
-    "jh": "jharkhand", "uk": "uttarakhand", "hp": "himachal pradesh", "jk": "jammu and kashmir",
-}
 _TOK = re.compile(r"[a-z0-9]+")
 
 
@@ -96,14 +81,7 @@ def skeleton(s: pd.Series) -> pd.Series:
 
 def norm_addr(s: pd.Series) -> pd.Series:
     def f(x):
-        toks = _TOK.findall(anyascii(x).lower())
-        out = []
-        for t in toks:
-            if t in _JUNK:
-                continue
-            t = _ADDR_ABBR.get(t, t)
-            out.append(_STATES.get(t, t) if len(t) == 2 else t)
-        return " ".join(out)
+        return " ".join(_ADDR_ABBR.get(t, t) for t in _TOK.findall(anyascii(x).lower()) if t not in _JUNK)
     return s.map(f)
 
 
