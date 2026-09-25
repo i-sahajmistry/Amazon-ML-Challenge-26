@@ -34,6 +34,7 @@ PLANS = {
            ("x_v7_cv", ["x_stage_multi.py", "cv"], {"TAG": "_all", "CE_TAGS": ",_base,_raw"}),
            ("x_v7_thr", ["x_thr.py", "_all"], {})],
 }
+PLANS["rawv7"] = PLANS["raw"] + PLANS["v7"]   # raw CE, then the three-CE stages
 ARGS = sys.argv[1:]
 PLAN = ARGS.pop(0) if ARGS and ARGS[0] in PLANS else "v5"   # python x_chain.py [plan] [first_step]
 STEPS = PLANS[PLAN]
