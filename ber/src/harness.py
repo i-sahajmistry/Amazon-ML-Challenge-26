@@ -33,9 +33,11 @@ def build(k, ts, s1f, rf, eval_folds=(9,), dis_folds=(0, 1, 2, 3, 9), share=0.39
     T = np.bincount(ts[matched], minlength=len(s1f))
     return sid, p, tru, T, np.where(ev)[0]
 
-def score(sid, acc, tru, T, ents):
+def score(sid, acc, tru, T, ents, wt=None):
+    """wt (optional): row weights; an accepted row counts wt times among the predictions (precision)."""
     n = len(T)
-    TP = np.bincount(sid[acc & tru], minlength=n)[ents]; P = np.bincount(sid[acc], minlength=n)[ents]; Tt = T[ents]
+    TP = np.bincount(sid[acc & tru], minlength=n)[ents]; Tt = T[ents]
+    P = np.bincount(sid[acc], weights=None if wt is None else wt[acc], minlength=n)[ents]
     with np.errstate(divide="ignore", invalid="ignore"):
         pr = np.where(P > 0, TP / np.maximum(P, 1), 0); rc = TP / np.maximum(Tt, 1)
         f = np.where(Tt == 0, (P == 0).astype(float), np.where(TP > 0, 1.25 * pr * rc / (0.25 * pr + rc), 0))

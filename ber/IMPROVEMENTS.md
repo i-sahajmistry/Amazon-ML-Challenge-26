@@ -15,8 +15,17 @@ git switch ber-pipeline
 git merge origin/ber-improvements
 ```
 
-Files touched: `ber/src/match.py`, `ber/requirements.txt`, this file. No conflict expected unless `_features` in
-`match.py` changed on your side.
+Files touched: `ber/src/match.py`, `ber/src/stage2.py`, `ber/src/harness.py`, `ber/requirements.txt`, this file.
+No conflict expected unless `_features` in `match.py`, `train_rows`/`cv` in `stage2.py` or `score` in `harness.py`
+changed on your side.
+
+**Recommended run = changes 1 + 3 together** (our next submission):
+```bash
+export SHORTLIST=gap:0.1 DISTRACTORS=weight
+python stage1_cv.py && python stage2.py cv && python stage2.py test
+```
+(delete the caches listed in 1 first; if stage 1 already ran with `SHORTLIST=gap:0.1`, only the two `stage2.py`
+steps are needed).
 
 ## 1. Adaptive shortlist: `SHORTLIST=gap:0.1` (tested, better)
 
@@ -59,21 +68,32 @@ Once reproduced, consider making `gap:0.1` the default in `match.py`.
 (`ModuleNotFoundError: numba`). Added `numba==0.67.0` and `llvmlite==0.49.0`; a pip dry run confirmed they keep
 `numpy==2.5.3`. Needed for the final submission zip to reproduce.
 
-## 3. Pending: stage 2 without duplicated distractors (`DISTRACTORS=weight`)
+## 3. Stage 2 without duplicated distractors: `DISTRACTORS=weight` (tested, better)
 
 **Finding.** `stage2.train_rows` reaches the 39% distractor share by drawing about 4.9M distractor rows **with
 replacement** from about 2.7M distinct ones (about 1.8 copies each; most distractors appear 2+ times). The copies of
 one record point to the same S1 and `context()` counts them as that S1's other records (`e_n`, `e_ge*`, `e_sum`). So
 the model learns and is validated on a cue test does not have (every test record appears once).
-`harness.build` duplicates the same way. This is our lead suspect for validation 0.988 vs leaderboard 0.967.
+`harness.build` duplicates the same way.
 
-**Change (commit 2a2c1fb on `v4-analysis`, added here only if it wins).** `DISTRACTORS=weight`: every distractor once
-with row weight = average copies (about 1.8), in the LightGBM loss, in the validation precision
-(`harness.score(..., wt=)`), in the threshold choice and in the refit. Default `dup` = current behaviour.
+**Change.** `DISTRACTORS=weight`: every distractor once with row weight = average copies (1.82), in the LightGBM
+loss, in the validation precision (`harness.score(..., wt=)`), in the threshold choice and in the refit.
+Default `dup` = current behaviour.
 
-**Status.** Being tested now: current vs weighted stage 2, both scored on the same no-copies validation weighted to
-39%. Note: that validation is harder than the current one (no copies to lean on), so its number is **not comparable
-to 0.989**; compare models on the same view only.
+**Evidence** (on top of gap 0.1; experiment `ber/experiments/distinct_distractors.py` on `v4-analysis`). Both stage-2
+models trained on folds 4-7 and scored on the **same** validation: folds 8-9, every distractor once, distractors
+weighted to 39% in precision.
+
+| | current (`dup`) | `weight` |
+|---|---|---|
+| F0.5 at thr 0.70 | 0.98620 | **0.98784** (+0.0016) |
+| F0.5 at each model's best threshold | 0.98684 (thr 0.80) | **0.98784** (thr 0.70), +0.0010 |
+| validation entities with an accepted distractor | 0.93% | **0.50%** |
+| test records accepted | 5.89M | 5.80M |
+
+The copies inflate the current validation: the same current model scores 0.98893 with copies and 0.98780 without,
+at the same 26% share (+0.0011), and 0.98905 on its own copied 39% validation. So **the `weight` run's validation
+(0.98784) is not comparable to 0.989**: it is a harder, more test-like measure. Compare models on the same view only.
 
 ## Other findings (no code change)
 

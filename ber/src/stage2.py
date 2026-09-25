@@ -2,7 +2,9 @@
 Stage 1 scores pairs independently; but whether a 0.5 record is real depends on its entity: with one other
 confident match it is usually real (entities average 3.5), with 3+ it is usually a distractor.
 Rows = one per record (its argmax S1 from stage 1). Trained on out-of-fold stage-1 probabilities with
-distractors resampled to the test share (~39%), so context counts look like test.
+distractors brought to the test share (~39%), so context counts look like test:
+  DISTRACTORS=dup     (default) distractor rows drawn with replacement; copies of a record share one S1 context
+  DISTRACTORS=weight  every distractor row once, weighted so the loss and the validation precision see SHARE
   python stage2.py cv    -> fit on entity folds 4-7, validate on 8-9, then refit on 4-9
   python stage2.py test  -> write output/matching_results.tsv + candidate_pairs.tsv"""
 import os, sys, json, numpy as np, pandas as pd, lightgbm as lgb
@@ -12,6 +14,7 @@ from match import to_sets, write_tsv
 from decide import select
 
 SHARE = float(os.environ.get("SHARE", 0.39))
+DISTRACTORS = os.environ.get("DISTRACTORS", "dup")
 OUT = os.environ.get("OUT", f"{ROOT}/output")
 S1F = ["score", "rank", "gap_next", "cn_tset", "cn_wj", "cn_eq", "na_tset", "na_wj", "num_first_eq", "num_partial",
        "b_addr_empty", "b_nonascii", "src3", "a_cn_s1_count", "b_cn_s1_count", "cn_a_unshared_max",
@@ -78,9 +81,14 @@ def train_rows():
     dis = ~matched[r] & (s1f[s] >= 4)
     rng = np.random.default_rng(0)
     pool = np.where(~matched)[0]
-    w = np.bincount(rng.choice(pool, int(SHARE / (1 - SHARE) * matched.sum()), replace=True), minlength=len(ts))
+    n_dis = int(SHARE / (1 - SHARE) * matched.sum())             # distractor rows needed for SHARE
     bd = b[dis]
-    d = pd.concat([b[keep_m], bd.loc[bd.index.repeat(w[bd.rid.values])]], ignore_index=True)
+    if DISTRACTORS == "weight":                                    # each record once, weight = average copies
+        d = pd.concat([b[keep_m].assign(wt=1.0), bd.assign(wt=n_dis / len(pool))], ignore_index=True)
+    else:
+        assert DISTRACTORS == "dup", DISTRACTORS
+        w = np.bincount(rng.choice(pool, n_dis, replace=True), minlength=len(ts))
+        d = pd.concat([b[keep_m], bd.loc[bd.index.repeat(w[bd.rid.values])]], ignore_index=True).assign(wt=1.0)
     d["y"] = ts[d.rid.values] == d.sid.values
     d["fold"] = s1f[d.sid.values]
     T = np.bincount(ts[matched], minlength=len(s1))
@@ -94,26 +102,31 @@ PARAMS = dict(objective="binary", learning_rate=0.05, num_leaves=63, min_data_in
 def cv():
     d, T, s1f = train_rows()
     X = design(d); y = d.y.values
+    wt = d.wt.values if DISTRACTORS == "weight" else None          # dup: unweighted, exactly as before
+    W = lambda msk: None if wt is None else wt[msk]
     tr, va = d.fold.values <= 7, d.fold.values >= 8
-    print("rows", len(d), "train", tr.sum(), "valid", va.sum(), "pos", y.mean().round(4), flush=True)
-    m = lgb.train(PARAMS, lgb.Dataset(X[tr], y[tr]), 3000, valid_sets=[lgb.Dataset(X[va], y[va])],
+    print("rows", len(d), "train", tr.sum(), "valid", va.sum(), "pos", y.mean().round(4), "distractors",
+          DISTRACTORS, flush=True)
+    m = lgb.train(PARAMS, lgb.Dataset(X[tr], y[tr], weight=W(tr)), 3000,
+                  valid_sets=[lgb.Dataset(X[va], y[va], weight=W(va))],
                   callbacks=[lgb.early_stopping(50), lgb.log_evaluation(200)])
     print(pd.Series(m.feature_importance("gain"), index=X.columns).sort_values(ascending=False).round(0).head(20).to_string())
     q = m.predict(X[va], num_threads=32)
-    sid, tru, p1 = d.sid.values[va], y[va], d.p.values[va]
+    sid, tru, p1, wv = d.sid.values[va], y[va], d.p.values[va], W(va)
     ents = np.where(s1f >= 8)[0]
     res = {}
     for thr in [0.4, 0.5, 0.6, 0.7]:
-        print(f"  stage-1 thr {thr}: {score(sid, p1 >= thr, tru, T, ents):.5f}", flush=True)
+        print(f"  stage-1 thr {thr}: {score(sid, p1 >= thr, tru, T, ents, wv):.5f}", flush=True)
     for thr in np.arange(0.3, 0.81, 0.05):
-        res[round(float(thr), 2)] = sc = score(sid, q >= thr, tru, T, ents)
+        res[round(float(thr), 2)] = sc = score(sid, q >= thr, tru, T, ents, wv)
         print(f"  stage-2 thr {thr:.2f}: {sc:.5f}", flush=True)
     for lam in [1.0, 1.2]:
-        print(f"  stage-2 expected-F lam {lam}: {score(sid, select(sid, q, lam), tru, T, ents):.5f}", flush=True)
+        print(f"  stage-2 expected-F lam {lam}: {score(sid, select(sid, q, lam), tru, T, ents, wv):.5f}", flush=True)
     thr = max(res, key=res.get)
-    json.dump({"thr": thr, "val": res[thr], "iters": m.best_iteration}, open(f"{WORK}/gbm2_cfg.json", "w"))
+    json.dump({"thr": thr, "val": res[thr], "iters": m.best_iteration, "distractors": DISTRACTORS},
+              open(f"{WORK}/gbm2_cfg.json", "w"))
     # refit on all entity folds 4-9
-    m2 = lgb.train(PARAMS, lgb.Dataset(X, y), int(m.best_iteration * 1.15))
+    m2 = lgb.train(PARAMS, lgb.Dataset(X, y, weight=wt), int(m.best_iteration * 1.15))
     m2.save_model(f"{WORK}/gbm2.txt")
     print("best thr", thr, res[thr], flush=True)
 
