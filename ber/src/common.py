@@ -42,7 +42,10 @@ _ADDR_ABBR = {  # US / India / France
     "se": "southeast", "sw": "southwest", "mg": "mahatma gandhi",
 }
 _LEGAL = set("private limited llp llc incorporated corporation company plc pllc pc lp llp sarl sas sasu eurl sa sci snc "
-             "the dba gmbh ltd pvt inc corp co and of".split())
+             "the dba gmbh ltd pvt inc corp co and of "
+             # transliterated Indic legal words (EDA §8) and French forms
+             "praivet praibhet prayvet limitet limted lmtd elelpi elelpee ei ets etablissements cie".split())
+_JUNK = {"null", "none", "nan", "na"}
 _STATES = {  # expand abbreviations to full names so "TX" == "Texas"; open set, unknown tokens pass through
     "al": "alabama", "ak": "alaska", "az": "arizona", "ar": "arkansas", "ca": "california", "co": "colorado",
     "ct": "connecticut", "de": "delaware", "fl": "florida", "ga": "georgia", "hi": "hawaii", "id": "idaho",
@@ -74,7 +77,21 @@ def norm_name(s: pd.Series) -> pd.Series:
 
 
 def core_name(s: pd.Series) -> pd.Series:
-    return s.map(lambda x: " ".join(t for t in x.split() if t not in _LEGAL))
+    def f(x):
+        out = []
+        for t in x.split():
+            if t not in _LEGAL and t not in _JUNK and (not out or out[-1] != t):  # drop legal words, collapse repeats
+                out.append(t)
+        return " ".join(out)
+    return s.map(f)
+
+
+_VOW = re.compile(r"[aeiouh]")
+
+
+def skeleton(s: pd.Series) -> pd.Series:
+    """consonant skeleton per token: absorbs vowel loss of transliteration (maharashtra -> mrstr)."""
+    return s.map(lambda x: " ".join(filter(None, (t[0] + _VOW.sub("", t[1:]) for t in x.split()))))
 
 
 def norm_addr(s: pd.Series) -> pd.Series:
@@ -82,6 +99,8 @@ def norm_addr(s: pd.Series) -> pd.Series:
         toks = _TOK.findall(anyascii(x).lower())
         out = []
         for t in toks:
+            if t in _JUNK:
+                continue
             t = _ADDR_ABBR.get(t, t)
             out.append(_STATES.get(t, t) if len(t) == 2 else t)
         return " ".join(out)

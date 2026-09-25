@@ -7,7 +7,8 @@ import sys, os, json, re, numpy as np, pandas as pd, lightgbm as lgb
 from multiprocessing import Pool
 from rapidfuzz import process, fuzz
 from rapidfuzz.distance import JaroWinkler, Levenshtein
-from common import load, s1_fold, norm_name, core_name, norm_addr, f05, WORK, ROOT
+from collections import Counter
+from common import load, s1_fold, norm_name, core_name, norm_addr, skeleton, f05, WORK, ROOT
 
 KF = int(os.environ.get("KF", 5))  # candidates per S2/S3 record that go to the matcher
 OUT = os.environ.get("OUT", f"{ROOT}/output")
@@ -18,8 +19,9 @@ _ZIP = re.compile(r"\b\d{5,6}\b")
 def _norm_chunk(df):
     nn = norm_name(df.business_name)
     na = norm_addr(df.business_address)
+    cn = core_name(nn)
     return pd.DataFrame({
-        "nn": nn, "cn": core_name(nn), "na": na,
+        "nn": nn, "cn": cn, "sk": skeleton(cn), "na": na,
         "num": na.map(lambda x: " ".join(_NUM.findall(x))),
         "zip": na.map(lambda x: (_ZIP.findall(x) or [""])[-1]),
         "nonascii": df.business_name.map(lambda x: not x.isascii()),
@@ -27,7 +29,7 @@ def _norm_chunk(df):
 
 
 def normed(split, src):
-    f = f"{WORK}/pq/norm_{split}_{src}.parquet"
+    f = f"{WORK}/pq/norm2_{split}_{src}.parquet"
     if os.path.exists(f):
         return pd.read_parquet(f)
     df = load(split, src)
@@ -38,7 +40,59 @@ def normed(split, src):
     return out
 
 
+_G = {}  # read-only globals shared with forked workers
+
+
+def _df_chunk(i):
+    col, lo, hi = _G["job"][i]
+    c = Counter()
+    for x in _G[col][lo:hi]:
+        c.update(set(x.split()))
+    return c
+
+
+def _idf(col, texts):
+    """log(N/df) over all texts of a split (S1 + S2 + S3)."""
+    _G[col] = texts
+    step = len(texts) // 256 + 1
+    _G["job"] = [(col, i, i + step) for i in range(0, len(texts), step)]
+    with Pool(32) as p:
+        df = Counter()
+        for c in p.imap_unordered(_df_chunk, range(len(_G["job"]))):
+            df.update(c)
+    n = len(texts)
+    return {t: float(np.log(n / v)) for t, v in df.items()}, float(np.log(n))
+
+
+def _wj_chunk(i):
+    """idf-weighted token overlap for pairs lo..hi: weighted jaccard, shared idf, max idf of unshared tokens per side."""
+    lo, hi = _G["job2"][i]
+    out = np.zeros((hi - lo, 8), np.float32)
+    for j, (ia, ib) in enumerate(zip(_G["sa"][lo:hi], _G["rb"][lo:hi])):
+        for f, (A, B, idf, dflt) in enumerate([(_G["a_cn"][ia], _G["b_cn"][ib], _G["idf_cn"], _G["d_cn"]),
+                                               (_G["a_na"][ia], _G["b_na"][ib], _G["idf_na"], _G["d_na"])]):
+            A, B = set(A.split()), set(B.split())
+            w = lambda S: sum(idf.get(t, dflt) for t in S)
+            inter, un = w(A & B), w(A | B)
+            out[j, 4 * f:4 * f + 4] = (inter / un if un else 0.0, inter,
+                                       max((idf.get(t, dflt) for t in A - B), default=0.0),
+                                       max((idf.get(t, dflt) for t in B - A), default=0.0))
+    return out
+
+
 def features(split):
+    f = f"{WORK}/feats2_{split}.parquet"
+    if os.environ.get("SMOKE"):
+        return _features(split)
+    if os.path.exists(f):
+        d = pd.read_parquet(f)
+        return d[["rid", "sid"]], d.drop(columns=["rid", "sid"]), load(split, 1),             pd.concat([load(split, 2), load(split, 3)], ignore_index=True)
+    keys, F, s1, other = _features(split)
+    pd.concat([keys, F], axis=1).to_parquet(f)
+    return keys, F, s1, other
+
+
+def _features(split):
     s1, n1 = load(split, 1), normed(split, 1)
     other = pd.concat([load(split, 2), load(split, 3)], ignore_index=True)
     n2 = pd.concat([normed(split, 2), normed(split, 3)], ignore_index=True)
@@ -49,7 +103,10 @@ def features(split):
     c["gap_top1"] = c.top1 - c.score
     c["next"] = g.shift(-1).fillna(-1)
     c["gap_next"] = c.score - c["next"]
-    c = c[c["rank"] < KF].reset_index(drop=True)
+    c = c[c["rank"] < KF]
+    if os.environ.get("SMOKE"):
+        c = c[c.rid < 20000]
+    c = c.reset_index(drop=True)
     c["s1_rank"] = c.groupby("sid").score.rank(ascending=False, method="first").astype(np.int16)
     c["s1_nref"] = c.groupby("sid").rid.transform("size").astype(np.int16)
     c["s1_ntop"] = c.assign(t=c["rank"] == 0).groupby("sid").t.transform("sum").astype(np.int16)
@@ -78,6 +135,27 @@ def features(split):
     F["b_nonascii"] = b.nonascii.values
     F["src3"] = other.entity_id.str.startswith("S3").values[c.rid.values]
     F["len_a"], F["len_b"] = a.nn.str.len().values, b.nn.str.len().values
+    # --- v2 features: consonant skeleton (Indic transliteration), truncated numbers, token rarity, name frequency
+    x, y = a.sk.tolist(), b.sk.tolist()
+    F["sk_ratio"] = process.cpdist(x, y, scorer=fuzz.ratio, **P)
+    F["sk_tset"] = process.cpdist(x, y, scorer=fuzz.token_set_ratio, **P)
+    F["num_partial"] = process.cpdist(a.num.tolist(), b.num.tolist(), scorer=fuzz.partial_token_set_ratio, **P)
+    _G["idf_cn"], _G["d_cn"] = _idf("t_cn", pd.concat([n1.cn, n2.cn]).tolist())
+    _G["idf_na"], _G["d_na"] = _idf("t_na", pd.concat([n1.na, n2.na]).tolist())
+    _G.update(a_cn=n1.cn.tolist(), b_cn=n2.cn.tolist(), a_na=n1.na.tolist(), b_na=n2.na.tolist(),
+              sa=c.sid.values, rb=c.rid.values)
+    step = len(c) // 1024 + 1
+    _G["job2"] = [(i, min(i + step, len(c))) for i in range(0, len(c), step)]
+    with Pool(32) as p:
+        W = np.concatenate(p.map(_wj_chunk, range(len(_G["job2"]))))
+    for j, nm in enumerate(["cn_wj", "cn_shared_idf", "cn_a_unshared_max", "cn_b_unshared_max",
+                            "na_wj", "na_shared_idf", "na_a_unshared_max", "na_b_unshared_max"]):
+        F[nm] = W[:, j]
+    # how common is the name: S1 entities / records in the same country with the identical core name
+    key1 = n1.cn + "|" + s1.country.values; key2 = n2.cn + "|" + other.country.values
+    F["a_cn_s1_count"] = key1.map(key1.value_counts()).values[c.sid.values]
+    F["a_cn_rec_count"] = key1.map(key2.value_counts()).fillna(0).values[c.sid.values]
+    F["b_cn_s1_count"] = key2.map(key1.value_counts()).fillna(0).values[c.rid.values]
     F = F.astype(np.float32)
     return c[["rid", "sid"]], F, s1, other
 
@@ -163,7 +241,7 @@ def write_tsv(path, col, sets, order):
 def main_test():
     keys, F, s1, other = features("test")
     m = lgb.Booster(model_file=f"{WORK}/gbm.txt")
-    thr = json.load(open(f"{WORK}/gbm_thr.json"))["thr"]
+    thr = float(os.environ.get("THR", json.load(open(f"{WORK}/gbm_thr.json"))["thr"]))
     p = m.predict(F, num_threads=32)
     os.makedirs(OUT, exist_ok=True)
     order = s1.entity_id.tolist()
