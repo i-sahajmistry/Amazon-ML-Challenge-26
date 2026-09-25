@@ -1,6 +1,8 @@
-import os, re, zlib
+import os, re, zlib, multiprocessing
 import numpy as np, pandas as pd
 from anyascii import anyascii
+
+multiprocessing.set_start_method("fork", force=True)   # python >= 3.14 defaults to forkserver; our pools share globals
 
 # default: the folder that contains src/ (put or symlink student_resource/ there), override with AMLC_ROOT
 ROOT = os.path.expanduser(os.environ.get("AMLC_ROOT", os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
@@ -32,58 +34,71 @@ _NAME_ABBR = {
     "mgmt": "management", "assoc": "associates", "bros": "brothers", "ent": "enterprises", "tech": "technologies",
     "&": "and", "n": "and",
 }
-_ADDR_ABBR = {  # US / India / France
+# Generic English defaults only (the noise the problem statement lists: Rd/Road, St/Street, Pvt/Private, Ltd/Limited).
+# Everything country- or language-specific (state codes, French street words, legal forms, transliteration
+# variants) is MINED per country label from the data by mine_dicts.py, and takes precedence over these defaults.
+_ADDR_ABBR = {
     "st": "street", "str": "street", "rd": "road", "ave": "avenue", "av": "avenue", "dr": "drive", "ct": "court",
-    "blvd": "boulevard", "bd": "boulevard", "ln": "lane", "hwy": "highway", "pkwy": "parkway", "pl": "place",
+    "blvd": "boulevard", "ln": "lane", "hwy": "highway", "pkwy": "parkway", "pl": "place",
     "cir": "circle", "trl": "trail", "ter": "terrace", "sq": "square", "apt": "apartment", "ste": "suite",
     "fl": "floor", "flr": "floor", "bldg": "building", "no": "number", "nr": "near", "opp": "opposite",
-    "r": "rue", "all": "allee", "chem": "chemin", "rte": "route", "imp": "impasse", "fbg": "faubourg",
     "n.": "north", "s.": "south", "e.": "east", "w.": "west", "ne": "northeast", "nw": "northwest",
-    "se": "southeast", "sw": "southwest", "mg": "mahatma gandhi",
+    "se": "southeast", "sw": "southwest",
 }
-_LEGAL = set("private limited llp llc incorporated corporation company plc pllc pc lp llp sarl sas sasu eurl sa sci snc "
-             "the dba gmbh ltd pvt inc corp co and of "
-             # transliterated Indic legal words (EDA §8) and French forms
-             "praivet praibhet prayvet limitet limted lmtd elelpi elelpee ei ets etablissements cie".split())
+_LEGAL = set("private limited llp llc incorporated corporation company plc pllc pc lp llp "
+             "the dba ltd pvt inc corp co and of "
+             # transliterated legal words found in the TRAINING data (EDA section 8)
+             "praivet praibhet prayvet limitet limted lmtd elelpi elelpee".split())
 _JUNK = {"null", "none", "nan", "na"}
-_STATES = {  # expand abbreviations to full names so "TX" == "Texas"; open set, unknown tokens pass through
-    "al": "alabama", "ak": "alaska", "az": "arizona", "ar": "arkansas", "ca": "california", "co": "colorado",
-    "ct": "connecticut", "de": "delaware", "fl": "florida", "ga": "georgia", "hi": "hawaii", "id": "idaho",
-    "il": "illinois", "in": "indiana", "ia": "iowa", "ks": "kansas", "ky": "kentucky", "la": "louisiana",
-    "me": "maine", "md": "maryland", "ma": "massachusetts", "mi": "michigan", "mn": "minnesota", "ms": "mississippi",
-    "mo": "missouri", "mt": "montana", "ne": "nebraska", "nv": "nevada", "nh": "new hampshire", "nj": "new jersey",
-    "nm": "new mexico", "ny": "new york", "nc": "north carolina", "nd": "north dakota", "oh": "ohio",
-    "ok": "oklahoma", "or": "oregon", "pa": "pennsylvania", "ri": "rhode island", "sc": "south carolina",
-    "sd": "south dakota", "tn": "tennessee", "tx": "texas", "ut": "utah", "vt": "vermont", "va": "virginia",
-    "wa": "washington", "wv": "west virginia", "wi": "wisconsin", "wy": "wyoming", "dc": "district of columbia",
-    "up": "uttar pradesh", "mh": "maharashtra", "tn.": "tamil nadu", "ka": "karnataka", "kl": "kerala",
-    "wb": "west bengal", "mp": "madhya pradesh", "hr": "haryana", "pb": "punjab", "rj": "rajasthan",
-    "gj": "gujarat", "ap": "andhra pradesh", "ts": "telangana", "dl": "delhi", "br": "bihar", "or.": "odisha",
-    "jh": "jharkhand", "uk": "uttarakhand", "hp": "himachal pradesh", "jk": "jammu and kashmir",
-}
 _TOK = re.compile(r"[a-z0-9]+")
+_NONE = {"name": {}, "address": {}, "legal": frozenset()}
+_MINED = None
+
+
+def mined():
+    """country label -> {"name": {short: long}, "address": {short: long}, "legal": set} (work/dicts, mine_dicts.py).
+    Missing dictionaries are an error (a silent fallback would change the normalisation); NO_DICTS=1 skips them."""
+    global _MINED
+    if _MINED is None:
+        _MINED = {}
+        if not os.environ.get("NO_DICTS"):
+            ab, lg = pd.read_parquet(f"{WORK}/dicts/abbr.parquet"), pd.read_parquet(f"{WORK}/dicts/legal.parquet")
+            for c in set(ab.country) | set(lg.country):
+                a = ab[ab.country == c]
+                _MINED[c] = {f: dict(zip(a.short[a.field == f], a.long[a.field == f])) for f in ("name", "address")}
+                _MINED[c]["legal"] = frozenset(lg.tok[lg.country == c])
+    return _MINED
+
+
+def _countries(s, c):
+    return c.tolist() if c is not None else [None] * len(s)
 
 
 def translit(s: pd.Series) -> pd.Series:
     return s.map(lambda x: anyascii(x).lower())
 
 
-def norm_name(s: pd.Series) -> pd.Series:
-    def f(x):
+def norm_name(s: pd.Series, c: pd.Series = None) -> pd.Series:
+    """c: country labels aligned with s (selects the mined dictionary; None = generic defaults only)."""
+    M = mined()
+    def f(x, cc):
+        m = M.get(cc, _NONE)["name"]
         x = anyascii(x).lower().replace("&", " and ")
-        x = re.sub(r"\.(com|in|net|org|co|fr|io|biz)\b", " ", x)  # website-style names
-        return " ".join(_NAME_ABBR.get(t, t) for t in _TOK.findall(x))
-    return s.map(f)
+        x = re.sub(r"\.(com|net|org|io|biz|[a-z]{2})\b", " ", x)  # website-style names (generic + any 2-letter TLD)
+        return " ".join(m.get(t) or _NAME_ABBR.get(t, t) for t in _TOK.findall(x))
+    return pd.Series([f(x, cc) for x, cc in zip(s.tolist(), _countries(s, c))], index=s.index)
 
 
-def core_name(s: pd.Series) -> pd.Series:
-    def f(x):
+def core_name(s: pd.Series, c: pd.Series = None) -> pd.Series:
+    M = mined()
+    def f(x, cc):
+        legal = M.get(cc, _NONE)["legal"]
         out = []
         for t in x.split():
-            if t not in _LEGAL and t not in _JUNK and (not out or out[-1] != t):  # drop legal words, collapse repeats
-                out.append(t)
+            if t not in _LEGAL and t not in legal and t not in _JUNK and (not out or out[-1] != t):
+                out.append(t)                                  # drop legal words, collapse repeats
         return " ".join(out)
-    return s.map(f)
+    return pd.Series([f(x, cc) for x, cc in zip(s.tolist(), _countries(s, c))], index=s.index)
 
 
 _VOW = re.compile(r"[aeiouh]")
@@ -94,17 +109,12 @@ def skeleton(s: pd.Series) -> pd.Series:
     return s.map(lambda x: " ".join(filter(None, (t[0] + _VOW.sub("", t[1:]) for t in x.split()))))
 
 
-def norm_addr(s: pd.Series) -> pd.Series:
-    def f(x):
-        toks = _TOK.findall(anyascii(x).lower())
-        out = []
-        for t in toks:
-            if t in _JUNK:
-                continue
-            t = _ADDR_ABBR.get(t, t)
-            out.append(_STATES.get(t, t) if len(t) == 2 else t)
-        return " ".join(out)
-    return s.map(f)
+def norm_addr(s: pd.Series, c: pd.Series = None) -> pd.Series:
+    M = mined()
+    def f(x, cc):
+        m = M.get(cc, _NONE)["address"]
+        return " ".join(m.get(t) or _ADDR_ABBR.get(t, t) for t in _TOK.findall(anyascii(x).lower()) if t not in _JUNK)
+    return pd.Series([f(x, cc) for x, cc in zip(s.tolist(), _countries(s, c))], index=s.index)
 
 
 def embed_text(df: pd.DataFrame) -> list:
@@ -132,6 +142,8 @@ if __name__ == "__main__":
     assert abs(f05({"a": {"x", "y", "w"}}, {"a": {"x", "y"}}) - 0.714285) < 1e-4  # README example
     assert f05({"b": set()}, {"b": set()}) == 1.0 and f05({"b": {"q"}}, {"b": set()}) == 0.0
     assert f05({}, t) == 1 / 3
-    print(norm_name(pd.Series(["Raab Modern Treoasubr,y LLC", "व्हाइट बिल्डर्स प्राइवेट लिमिटेड", "wilfordhancock.com", "Grain & Fils"])).tolist())
-    print(norm_addr(pd.Series(["2670- DUMBLE ST, ALVIN, TX", "63 R. DE DIEPPE, LILLE, Hauts-de-France"])).tolist())
+    names = pd.Series(["Raab Modern Treoasubr,y LLC", "व्हाइट बिल्डर्स प्राइवेट लिमिटेड", "wilfordhancock.com", "Grain & Fils"])
+    print(norm_name(names, pd.Series(["US", "India", "US", "France"])).tolist())
+    print(norm_addr(pd.Series(["2670- DUMBLE ST, ALVIN, TX", "63 R. DE DIEPPE, LILLE, Hauts-de-France"]),
+                    pd.Series(["US", "France"])).tolist())
     print("ok")

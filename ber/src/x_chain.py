@@ -35,6 +35,28 @@ PLANS = {
            ("x_v7_thr", ["x_thr.py", "_all"], {})],
 }
 PLANS["rawv7"] = PLANS["raw"] + PLANS["v7"]   # raw CE, then the three-CE stages
+# v8: country-agnostic and compliant. Mined dictionaries (no hand-written country lists), learned shortlist,
+# small + raw-text cross-encoders (e5-base dropped: +0.00003 in v6), words.py features, copy-free stage 2 scored
+# per stage-1 model, one threshold. Needs cand_*.parquet + e5_ft (train_embed.py, retrieve.py) first.
+_V8 = {"SHORTLIST": "learned:0.001"}
+_V8S = {**_V8, "TAG": "_v8", "CE_TAGS": ",_raw", "WORDS": "1"}
+PLANS["v8"] = [("v8_mine_dicts", ["mine_dicts.py"], _V8),
+               ("v8_prep_norm", ["prep_norm.py"], _V8),
+               ("v8_shortlist", ["shortlist.py"], _V8),
+               ("v8_stage1_v4", ["stage1_cv.py"], _V8),
+               ("v8_x_feats_train", ["x_feats.py", "train"], _V8),
+               ("v8_x_feats_test", ["x_feats.py", "test"], _V8),
+               ("v8_words", ["words.py"], _V8),
+               ("v8_ce_train", ["x_ce.py", "train"], {**_V8, "CE_N": "12000000"}),
+               ("v8_ce_score_train", ["x_ce.py", "score", "train"], _V8),
+               ("v8_ce_score_test", ["x_ce.py", "score", "test"], _V8),
+               ("v8_ce_raw_train", ["x_ce3.py", "train"], {**_V8, "CE_TEXT": "raw", "CE_DIR": f"{WORK}/x/ce_raw", "CE_N": "12000000"}),
+               ("v8_ce_raw_score_train", ["x_ce3.py", "score", "train"], {**_V8, "CE_TEXT": "raw", "CE_DIR": f"{WORK}/x/ce_raw", "CE_TAG": "_raw"}),
+               ("v8_ce_raw_score_test", ["x_ce3.py", "score", "test"], {**_V8, "CE_TEXT": "raw", "CE_DIR": f"{WORK}/x/ce_raw", "CE_TAG": "_raw"}),
+               ("v8_stage1", ["x_stage_multi.py", "s1"], _V8S),
+               ("v8_stage2_compare", ["x_nocopy.py"], _V8S),
+               ("v8_stage2_test", ["x_nocopy.py", "test"], _V8S),
+               ("v8_final", ["x_final.py", f"{os.path.dirname(WORK)}/output_v8", "_v8w", "0.70"], _V8S)]
 ARGS = sys.argv[1:]
 PLAN = ARGS.pop(0) if ARGS and ARGS[0] in PLANS else "v5"   # python x_chain.py [plan] [first_step]
 STEPS = PLANS[PLAN]

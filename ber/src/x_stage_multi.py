@@ -11,6 +11,7 @@ from match import to_sets, write_tsv
 from stage2 import best_rows, context, S1F, PARAMS as P2
 
 XD = f"{WORK}/x"
+NT = int(os.environ.get("NT", 16))
 SHARE = float(os.environ.get("SHARE", 0.39))
 OUT = os.environ.get("OUT", f"{ROOT}/output_v5{os.environ.get('TAG', '')}")
 NOCE = bool(os.environ.get("NOCE"))   # baseline: v4 stage 1, no CE features, same clean validation set
@@ -20,6 +21,8 @@ CEF = [] if NOCE else [f"ce{t}{c}" for t in CE_TAGS for c in ("", "_rank", "_gap
 EXF = [] if NOCE or os.environ.get("NOEXTRA") else [  # x_feats.py
     "int_first_eq", "int_a0_in_b", "int_a0_mindiff", "int_jacc", "int_a_only", "int_b_only",
     "legal_added", "legal_dropped", "legal_a", "legal_b", "legal_xor"]
+WORDF = ["w_add_max", "w_add_sum", "w_add_n8", "w_addrate_max", "w_drop_max", "w_n_add", "w_n_drop"] \
+    if os.environ.get("WORDS") else []   # words.py: country-agnostic distractor-word features
 LLRF = [f"{f}_{e}_{t}" for f in ("n", "a") for e in ("add", "drop") for t in ("sum", "min", "max", "cnt")]     if os.environ.get("LLR") else []   # x_llr.py word-edit log-likelihood ratios
 
 
@@ -56,6 +59,8 @@ def stage1_data(split):
         parts.append(pd.read_parquet(f"{XD}/extra_{split}.parquet", columns=EXF))
     if LLRF:
         parts.append(pd.read_parquet(f"{XD}/llr_{split}.parquet", columns=LLRF))
+    if WORDF:
+        parts.append(pd.read_parquet(f"{XD}/words_{split}.parquet", columns=WORDF))
     F = pd.concat(parts, axis=1)
     return keys, F
 
@@ -67,7 +72,7 @@ def s1():
     kf = rf[keys.rid.values]
     gA, gB = np.isin(kf, [4, 5, 6]), np.isin(kf, [7, 8, 9])
     params = dict(objective="binary", learning_rate=0.05, num_leaves=255, min_data_in_leaf=200, feature_fraction=0.8,
-                  bagging_fraction=0.5, bagging_freq=1, num_threads=32, verbose=-1, seed=0)
+                  bagging_fraction=0.5, bagging_freq=1, num_threads=NT, verbose=-1, seed=0)
     models = {}
     for name, tr, va in [("A", gA, gB), ("B", gB, gA)]:
         m = lgb.train(params, lgb.Dataset(F[tr], y[tr]), 4000, valid_sets=[lgb.Dataset(F[va], y[va])],
@@ -76,12 +81,14 @@ def s1():
         print(name, "best iter", m.best_iteration, flush=True)
     print(pd.Series(models["A"].feature_importance("gain"), index=F.columns).sort_values(ascending=False)
           .round(0).head(20).to_string(), flush=True)
-    pA, pB = models["A"].predict(F, num_threads=32), models["B"].predict(F, num_threads=32)
+    pA, pB = models["A"].predict(F, num_threads=NT), models["B"].predict(F, num_threads=NT)
     keys.assign(p=np.where(gB, pA, np.where(gA, pB, (pA + pB) / 2)).astype(np.float32)).to_parquet(f"{XD}/oof5_train{TAG}.parquet")
     del F
     kt, Ft = stage1_data("test")
-    pt = (models["A"].predict(Ft, num_threads=32) + models["B"].predict(Ft, num_threads=32)) / 2
-    kt.assign(p=pt.astype(np.float32)).to_parquet(f"{XD}/p5_test{TAG}.parquet")
+    pA_t, pB_t = models["A"].predict(Ft, num_threads=NT), models["B"].predict(Ft, num_threads=NT)
+    # pA / pB kept so stage 2 can be scored once per stage-1 model (it was trained on single-model probabilities)
+    kt.assign(p=((pA_t + pB_t) / 2).astype(np.float32), pA=pA_t.astype(np.float32),
+              pB=pB_t.astype(np.float32)).to_parquet(f"{XD}/p5_test{TAG}.parquet")
     print("stage 1 done", flush=True)
 
 
@@ -97,6 +104,8 @@ def rows(split, k):
         parts.append(pd.read_parquet(f"{XD}/extra_{split}.parquet", columns=EXF).iloc[b.i.values].reset_index(drop=True))
     if LLRF:
         parts.append(pd.read_parquet(f"{XD}/llr_{split}.parquet", columns=LLRF).iloc[b.i.values].reset_index(drop=True))
+    if WORDF:
+        parts.append(pd.read_parquet(f"{XD}/words_{split}.parquet", columns=WORDF).iloc[b.i.values].reset_index(drop=True))
     return pd.concat(parts, axis=1)
 
 
@@ -118,7 +127,7 @@ def train_rows():
 
 
 def design(d):
-    X = d[["p", "p2"] + [c for c in d.columns if c.startswith("e_")] + ["rec_n20"] + S1F + CEF + EXF + LLRF].astype(np.float32)
+    X = d[["p", "p2"] + [c for c in d.columns if c.startswith("e_")] + ["rec_n20"] + S1F + CEF + EXF + LLRF + WORDF].astype(np.float32)
     return X.assign(margin=X.p - X.p2)
 
 
@@ -130,7 +139,7 @@ def cv():
     m = lgb.train(P2, lgb.Dataset(X[tr], y[tr]), 4000, valid_sets=[lgb.Dataset(X[va], y[va])],
                   callbacks=[lgb.early_stopping(50), lgb.log_evaluation(200)])
     print(pd.Series(m.feature_importance("gain"), index=X.columns).sort_values(ascending=False).round(0).head(15).to_string())
-    q = m.predict(X[va], num_threads=32)
+    q = m.predict(X[va], num_threads=NT)
     sid, tru, ents = d.sid.values[va], y[va], np.where(s1f >= 8)[0]
     d.loc[va, ["rid", "sid", "p", "y"]].assign(q=q).to_parquet(f"{XD}/s5_val{TAG}.parquet")
     res = {}
@@ -151,7 +160,7 @@ def test():
     s1_ = load("test", 1); other = pd.concat([load("test", 2), load("test", 3)], ignore_index=True)
     k = pd.read_parquet(f"{XD}/p5_test{TAG}.parquet")
     d = context(rows("test", k))
-    q = lgb.Booster(model_file=f"{XD}/gbm5s2{TAG}.txt").predict(design(d), num_threads=32)
+    q = lgb.Booster(model_file=f"{XD}/gbm5s2{TAG}.txt").predict(design(d), num_threads=NT)
     acc = d[q >= thr][["rid", "sid"]]
     os.makedirs(OUT, exist_ok=True)
     order = s1_.entity_id.tolist()

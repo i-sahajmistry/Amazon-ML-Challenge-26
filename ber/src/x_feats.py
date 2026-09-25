@@ -2,24 +2,25 @@
 - integer-aware address numbers: "0044" == "44" is noise, "58" vs "59" is a different business;
 - legal-form edits: "Private Limited" -> "LLP" or "Limited" -> "Pvt Ltd" marks a distractor, dropped words are noise.
   python x_feats.py train|test   -> x/extra_{split}.parquet, rows in feats2 order"""
-import sys, math, numpy as np, pandas as pd
-from multiprocessing import Pool
-from common import WORK
+import os, sys, math, numpy as np, pandas as pd
+from multiprocessing import get_context
+from common import WORK, load, mined
 from match import normed
 
 LEGAL = {"private": 1, "praivet": 1, "praibhet": 1, "prayvet": 1, "limited": 2, "limitet": 2, "limted": 2, "lmtd": 2,
-         "llp": 4, "elelpi": 4, "elelpee": 4, "llc": 8, "incorporated": 16, "corporation": 32, "company": 64, "cie": 64,
-         "pc": 128, "pllc": 128, "lp": 256, "plc": 256, "partners": 256, "sarl": 512, "sas": 512, "sasu": 512,
-         "eurl": 512, "sa": 512, "sci": 512, "snc": 512, "holdings": 1024, "group": 1024, "center": 2048,
-         "centre": 2048, "services": 4096, "enterprises": 4096, "trust": 8192, "foundation": 8192, "society": 8192}
+         "llp": 4, "elelpi": 4, "elelpee": 4, "llc": 8, "incorporated": 16, "corporation": 32, "company": 64,
+         "pc": 128, "pllc": 128, "lp": 256, "plc": 256, "partners": 256, "holdings": 1024, "group": 1024,
+         "center": 2048, "centre": 2048, "services": 4096, "enterprises": 4096, "trust": 8192, "foundation": 8192,
+         "society": 8192}
+MINED_BIT = 512   # any legal-form token mined for the record's own country (common.mined(), mine_dicts.py)
 POP = np.array([bin(i).count("1") for i in range(1 << 14)], np.int8)
 _G = {}
 
 
-def legal_bits(nn):
+def legal_bits(nn, mined_legal=frozenset()):
     b = 0
     for t in nn.split():
-        b |= LEGAL.get(t, 0)
+        b |= LEGAL.get(t, 0) or (MINED_BIT if t in mined_legal else 0)
     s = f" {nn} "
     return b | (4 if " l l p " in s else 0) | (8 if " l l c " in s else 0)
 
@@ -47,12 +48,16 @@ def main(split):
     keys = pd.read_parquet(f"{WORK}/feats2_{split}.parquet", columns=["rid", "sid"])
     n1 = normed(split, 1)
     n2 = pd.concat([normed(split, 2), normed(split, 3)], ignore_index=True)
-    la = n1.nn.map(legal_bits).values.astype(np.int32)[keys.sid.values]
-    lb = n2.nn.map(legal_bits).values.astype(np.int32)[keys.rid.values]
+    M = mined()
+    lg = lambda c: M.get(c, {}).get("legal", frozenset())
+    c1 = load(split, 1).country.values
+    c2 = pd.concat([load(split, 2), load(split, 3)], ignore_index=True).country.values
+    la = np.array([legal_bits(x, lg(c)) for x, c in zip(n1.nn.values, c1)], np.int32)[keys.sid.values]
+    lb = np.array([legal_bits(x, lg(c)) for x, c in zip(n2.nn.values, c2)], np.int32)[keys.rid.values]
     _G.update(ia=n1.num.map(ints).tolist(), ib=n2.num.map(ints).tolist(), sa=keys.sid.values, rb=keys.rid.values)
     step = len(keys) // 2048 + 1
     _G["job"] = [(i, min(i + step, len(keys))) for i in range(0, len(keys), step)]
-    with Pool(32) as p:
+    with get_context("fork").Pool(int(os.environ.get("NPROC", 16))) as p:
         I = np.concatenate(p.map(_chunk, range(len(_G["job"]))))
     out = pd.DataFrame(I, columns=["int_first_eq", "int_a0_in_b", "int_a0_mindiff", "int_jacc", "int_a_only", "int_b_only"])
     out["legal_added"] = POP[lb & ~la]

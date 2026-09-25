@@ -11,18 +11,7 @@ from common import load
 from harness import truth_arrays, score
 from stage2 import context
 import x_stage_multi as X
-
-
-def wscore(sid, acc, tru, wt, T, ents):
-    """harness.score with weighted false positives (a distractor row counts W times)."""
-    n = len(T)
-    tp = np.bincount(sid[acc & tru], minlength=n)[ents]
-    fp = np.bincount(sid[acc & ~tru], weights=wt[acc & ~tru], minlength=n)[ents]
-    t = T[ents]
-    pr = np.divide(tp, tp + fp, out=np.zeros(len(t)), where=tp + fp > 0)
-    rc = tp / np.maximum(t, 1)
-    f = np.divide(1.25 * pr * rc, 0.25 * pr + rc, out=np.zeros(len(t)), where=tp > 0)
-    return np.where(t == 0, (tp + fp == 0).astype(float), f).mean()
+from x_judge import wscore, record_inputs
 
 
 s1_, _, ts, s1f, rf = truth_arrays()
@@ -59,7 +48,7 @@ for name, d, wt in ((("copies", dup, None),) if not TEST else ()) + (("weighted"
     models[name] = lgb.train(X.P2, lgb.Dataset(X.design(d[tr]), d.y.values[tr], weight=None if wt is None else wt[tr]),
                              4000, valid_sets=[lgb.Dataset(Xv, yv, weight=wv)],
                              callbacks=[lgb.early_stopping(50), lgb.log_evaluation(500)])
-q = {k: m.predict(Xv, num_threads=32) for k, m in models.items()}
+q = {k: m.predict(Xv, num_threads=X.NT) for k, m in models.items()}
 if TEST:
     for thr in np.arange(0.5, 0.91, 0.05):
         print(f"{thr:.2f}  weighted-trained, copy-free {wscore(sid_v, q['weighted'] >= thr, yv, wv, T, ents):.5f}", flush=True)
@@ -67,8 +56,22 @@ if TEST:
                      int(models["weighted"].best_iteration * 1.15))
     full.save_model(f"{X.XD}/gbm5s2{X.TAG}w.txt")
     k = pd.read_parquet(f"{X.XD}/p5_test{X.TAG}.parquet")
-    d = context(X.rows("test", k))
-    d["q"] = full.predict(X.design(d), num_threads=32)
+    b = X.rows("test", k)                                  # each record's argmax S1 under the mean of A and B
+    d = context(b)
+    if {"pA", "pB"} <= set(k.columns):
+        # stage 2 was trained on single-model out-of-fold probabilities, so it is scored once with model A's and
+        # once with model B's (p, p2, rec_n20 and the entity context all recomputed), and the two scores averaged
+        idx = pd.MultiIndex.from_arrays([d.rid.values, d.sid.values])
+        qs = []
+        for col in ("pA", "pB"):
+            bv = b.copy()
+            bv["p"], bv["p2"], bv["rec_n20"] = record_inputs(k, k[col].values, bv.i.values)
+            dv = context(bv)
+            qs.append(pd.Series(full.predict(X.design(dv), num_threads=X.NT),
+                                index=pd.MultiIndex.from_arrays([dv.rid.values, dv.sid.values])).loc[idx].values)
+        d["q"] = (qs[0] + qs[1]) / 2
+    else:
+        d["q"] = full.predict(X.design(d), num_threads=X.NT)
     d["c"] = load("test", 1).country.values[d.sid.values]
     d[["rid", "sid", "q", "c"]].to_parquet(f"{X.XD}/test_q{X.TAG}w.parquet")
     if not os.path.exists(f"{X.XD}/p5_test{X.TAG}w.parquet"):   # x_final.py reads candidates by the same tag
@@ -76,7 +79,7 @@ if TEST:
     print("wrote", f"{X.XD}/test_q{X.TAG}w.parquet", flush=True)
     sys.exit()
 vd = dup.fold.values >= 8
-q_dup = models["copies"].predict(X.design(dup[vd]), num_threads=32)
+q_dup = models["copies"].predict(X.design(dup[vd]), num_threads=X.NT)
 print("thr    copies-trained: on copies (as x_stage cv) | copy-free     weighted-trained: copy-free", flush=True)
 for thr in np.arange(0.5, 0.91, 0.05):
     a = score(dup.sid.values[vd], q_dup >= thr, dup.y.values[vd], T, ents)

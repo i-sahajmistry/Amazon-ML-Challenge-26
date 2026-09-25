@@ -10,16 +10,17 @@ from rapidfuzz.distance import JaroWinkler, Levenshtein
 from collections import Counter
 from common import load, s1_fold, norm_name, core_name, norm_addr, skeleton, f05, WORK, ROOT
 
-KF = int(os.environ.get("KF", 5))  # candidates per S2/S3 record that go to the matcher
+KF = int(os.environ.get("KF", 5))  # candidates per S2/S3 record that go to the matcher (fixed top-KF)
+SHORTLIST = os.environ.get("SHORTLIST", "")  # "learned:TAU" = shortlist.py's adaptive shortlist instead of top-KF
 OUT = os.environ.get("OUT", f"{ROOT}/output")
 _NUM = re.compile(r"\d+")
 _ZIP = re.compile(r"\b\d{5,6}\b")
 
 
 def _norm_chunk(df):
-    nn = norm_name(df.business_name)
-    na = norm_addr(df.business_address)
-    cn = core_name(nn)
+    nn = norm_name(df.business_name, df.country)
+    na = norm_addr(df.business_address, df.country)
+    cn = core_name(nn, df.country)
     return pd.DataFrame({
         "nn": nn, "cn": cn, "sk": skeleton(cn), "na": na,
         "num": na.map(lambda x: " ".join(_NUM.findall(x))),
@@ -81,7 +82,7 @@ def _wj_chunk(i):
 
 
 def features(split):
-    f = f"{WORK}/feats2_{split}.parquet"
+    f = f"{WORK}/feats2_{split}.parquet"   # delete it (and everything built on it) when KF / SHORTLIST changes
     if os.environ.get("SMOKE"):
         return _features(split)
     if os.path.exists(f):
@@ -103,7 +104,12 @@ def _features(split):
     c["gap_top1"] = c.top1 - c.score
     c["next"] = g.shift(-1).fillna(-1)
     c["gap_next"] = c.score - c["next"]
-    c = c[c["rank"] < KF]
+    if SHORTLIST.startswith("learned:"):
+        from shortlist import keep
+        c = c[keep(c, float(SHORTLIST.split(":")[1]))]
+    else:
+        assert not SHORTLIST, SHORTLIST
+        c = c[c["rank"] < KF]
     if os.environ.get("SMOKE"):
         c = c[c.rid < 20000]
     c = c.reset_index(drop=True)
