@@ -112,16 +112,17 @@ def main_train():
     kf = rf[keys.rid.values]
     tr, va = (kf >= 4) & (kf <= 8), kf == 9
     print("pairs", len(keys), "train", tr.sum(), "val", va.sum(), "pos rate", y[tr].mean(), flush=True)
-    params = dict(objective="binary", learning_rate=0.1, num_leaves=255, min_data_in_leaf=200, feature_fraction=0.8,
+    params = dict(objective="binary", learning_rate=0.05, num_leaves=255, min_data_in_leaf=200, feature_fraction=0.8,
                   bagging_fraction=0.5, bagging_freq=1, num_threads=32, verbose=-1)
     dtr = lgb.Dataset(F[tr], y[tr]); dva = lgb.Dataset(F[va], y[va], reference=dtr)
-    m = lgb.train(params, dtr, 600, valid_sets=[dva], callbacks=[lgb.early_stopping(30), lgb.log_evaluation(50)])
+    m = lgb.train(params, dtr, 2000, valid_sets=[dva], callbacks=[lgb.early_stopping(30), lgb.log_evaluation(50)])
     m.save_model(f"{WORK}/gbm.txt")
     imp = pd.Series(m.feature_importance("gain"), index=F.columns).sort_values(ascending=False)
     print(imp.round(0).to_string(), flush=True)
     # threshold on fold 9, macro F0.5 over fold-9 S1 entities
     p = m.predict(F[va], num_threads=32)
     kv = keys[va].reset_index(drop=True)
+    kv.assign(p=p, y=y[va]).to_parquet(f"{WORK}/val_pred.parquet")
     vs1 = s1.entity_id.values[s1f == 9]
     truth = {k: set() for k in vs1}
     for s, r in zip(pairs.source1_entity_id.values, pairs.m.values):
@@ -132,7 +133,7 @@ def main_train():
 
 def tune(kv, p, yv, truth, s1, other):
     best = (0, 0.5)
-    for thr in np.arange(0.3, 0.96, 0.05):
+    for thr in np.arange(0.05, 0.96, 0.05):
         pred = to_sets(assign(kv, p, thr), s1, other)
         sc = f05(pred, truth)
         print(f"thr {thr:.2f}  F0.5 {sc:.5f}", flush=True)
@@ -141,6 +142,15 @@ def tune(kv, p, yv, truth, s1, other):
     ceil = to_sets(kv[yv], s1, other)
     print("best", best, "candidate ceiling F0.5", round(f05(ceil, truth), 5), flush=True)
     json.dump({"thr": best[1], "val_f05": best[0]}, open(f"{WORK}/gbm_thr.json", "w"))
+
+
+def main_tune():
+    s1, other = load("train", 1), pd.concat([load("train", 2), load("train", 3)], ignore_index=True)
+    v = pd.read_parquet(f"{WORK}/val_pred.parquet")
+    gt = load("train", "ground_truth")
+    gt = gt[s1_fold(gt.source1_entity_id.tolist()) == 9]
+    truth = {k: set(x for x in m.split(",") if x) for k, m in zip(gt.source1_entity_id, gt.matched_entity_ids)}
+    tune(v[["rid", "sid"]], v.p.values, v.y.values, truth, s1, other)
 
 
 def write_tsv(path, col, sets, order):
@@ -163,4 +173,4 @@ def main_test():
 
 
 if __name__ == "__main__":
-    {"train": main_train, "test": main_test}[sys.argv[1]]()
+    {"train": main_train, "test": main_test, "tune": main_tune}[sys.argv[1]]()
