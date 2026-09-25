@@ -11,6 +11,11 @@ from collections import Counter
 from common import load, s1_fold, norm_name, core_name, norm_addr, skeleton, f05, WORK, ROOT
 
 KF = int(os.environ.get("KF", 5))  # candidates per S2/S3 record that go to the matcher
+# Adaptive shortlist (empty = fixed top-KF):
+#   SHORTLIST="softmax:T:c"  per record, the fewest top candidates whose softmax(score / T) sums to >= c
+#   SHORTLIST="gap:d"        per record, every candidate scoring within d of the record's best
+# Both always keep the best candidate.
+SHORTLIST = os.environ.get("SHORTLIST", "")
 OUT = os.environ.get("OUT", f"{ROOT}/output")
 _NUM = re.compile(r"\d+")
 _ZIP = re.compile(r"\b\d{5,6}\b")
@@ -92,6 +97,22 @@ def features(split):
     return keys, F, s1, other
 
 
+def keep_mask(c):
+    """Which retrieved candidates go to the matcher: fixed top-KF, or an adaptive prefix (softmax / gap).
+    Rows of a record are contiguous and in rank order (as written by retrieve.py)."""
+    if not SHORTLIST:
+        return (c["rank"] < KF).to_numpy()
+    kind, *args = SHORTLIST.split(":")
+    if kind == "gap":
+        return c.score.to_numpy() >= c.top1.to_numpy() - float(args[0])
+    assert kind == "softmax", SHORTLIST
+    T, cut = args
+    e = np.exp((c.score.to_numpy(np.float64) - c.top1.to_numpy(np.float64)) / float(T))
+    g = pd.Series(e).groupby(c.rid.to_numpy())
+    before = (g.cumsum() - e) / g.transform("sum")          # probability mass of the better-ranked candidates
+    return (before < float(cut) - 1e-9).to_numpy()          # keep until the running total reaches c
+
+
 def _features(split):
     s1, n1 = load(split, 1), normed(split, 1)
     other = pd.concat([load(split, 2), load(split, 3)], ignore_index=True)
@@ -103,7 +124,7 @@ def _features(split):
     c["gap_top1"] = c.top1 - c.score
     c["next"] = g.shift(-1).fillna(-1)
     c["gap_next"] = c.score - c["next"]
-    c = c[c["rank"] < KF]
+    c = c[keep_mask(c)]
     if os.environ.get("SMOKE"):
         c = c[c.rid < 20000]
     c = c.reset_index(drop=True)
