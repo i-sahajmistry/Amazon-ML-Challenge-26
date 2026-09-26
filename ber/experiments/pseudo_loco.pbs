@@ -1,0 +1,26 @@
+#!/bin/bash
+#PBS -N pseudo_loco
+#PBS -P scai
+#PBS -q scai_q
+#PBS -l select=1:ncpus=8:ngpus=1:mem=400gb
+#PBS -l walltime=03:00:00
+# Does self-training help a country the model never saw? On the finished held-out-India run: pseudo-label India's sure
+# pairs from its current stage-1 scores (pseudo.py; prints their accuracy against India's true labels), retrain the
+# stage-1 judges with US labels + those pseudo-labels (x_stage_multi.py s1 PSEUDO=...; India's true labels unused),
+# then score India exactly like test (loco_eval.py). Baseline: India 0.90699 at 0.70 (loco_eval.log). One variant per
+# pseudo-label weight in WEIGHTS. CPU only (scai_q requires a GPU). Logs: ~/scratch/amlc_loco_india/work/logs/pseudo_*
+# Submit:  qsub ~/scratch/ber_llm/ber/experiments/pseudo_loco.pbs
+#          qsub -v WEIGHTS="1.0",P_HI=0.99 ...
+PY=${PY:-$HOME/scratch/miniconda3/envs/amlc312/bin/python}
+set -ex -o pipefail
+R=${RUNDIR:-$HOME/scratch/amlc_loco_india}
+export AMLC_ROOT=$R HOLDOUT=${HOLDOUT:-India} SKIP_TEST=1 SHORTLIST=learned:0.001 NT=8 NCPUS=8 CE_TAGS=,_raw WORDS=1
+L=$R/work/logs
+cd "${CODE:-$HOME/scratch/ber_llm}/ber/src"
+TAG=_v8 SPLIT=train "$PY" -u pseudo.py 2>&1 | tee "$L/pseudo_labels.log"
+for W in ${WEIGHTS:-1.0 0.3}; do
+    T=_v8pw$(echo "$W" | tr -d .)
+    TAG=$T PSEUDO=$R/work/x/pseudo_v8_train.parquet PSEUDO_W=$W "$PY" -u x_stage_multi.py s1 > "$L/pseudo_s1$T.log" 2>&1
+    TAG=$T "$PY" -u loco_eval.py 2>&1 | tee "$L/pseudo_eval$T.log" | grep -E -A4 "^SUMMARY|held-out|q bands"
+done
+echo "pseudo test done $(date +%T)"

@@ -24,6 +24,7 @@ EXF = [] if NOCE or os.environ.get("NOEXTRA") else [  # x_feats.py
 WORDF = ["w_add_max", "w_add_sum", "w_add_n8", "w_addrate_max", "w_drop_max", "w_n_add", "w_n_drop"] \
     if os.environ.get("WORDS") else []   # words.py: country-agnostic distractor-word features
 LLRF = [f"{f}_{e}_{t}" for f in ("n", "a") for e in ("add", "drop") for t in ("sum", "min", "max", "cnt")]     if os.environ.get("LLR") else []   # x_llr.py word-edit log-likelihood ratios
+PSEUDO_W = float(os.environ.get("PSEUDO_W", 1.0))   # weight of pseudo-labelled stage-1 rows (pseudo.py)
 # llm_judge.py: an offline LLM's log-odds that the record and its best S1 are the same business, the best score among
 # the record's other judged candidates, and the gap; NaN where the record was not judged (confident records)
 LLMF = ["llm", "llm_alt", "llm_gap"] if os.environ.get("LLM") else []
@@ -68,18 +69,47 @@ def stage1_data(split):
     return keys, F
 
 
+def _pseudo(keys, f):
+    """positions in keys of the pairs pseudo.py labelled in file f, and their pseudo-labels."""
+    P = pd.read_parquet(f)
+    idx = pd.MultiIndex.from_arrays([keys.rid.values, keys.sid.values]).get_indexer(
+        pd.MultiIndex.from_arrays([P.rid.values, P.sid.values]))
+    assert (idx >= 0).all(), "pseudo-labelled pairs missing from the stage-1 rows"
+    return idx, P.y.values.astype(bool)
+
+
 def s1():
     _, _, ts, s1f, rf = truth_arrays()
     keys, F = stage1_data("train")
     y = ts[keys.rid.values] == keys.sid.values
     kf = rf[keys.rid.values]
     gA, gB = np.isin(kf, [4, 5, 6]), np.isin(kf, [7, 8, 9])
+    # self-training (pseudo.py): pseudo-labelled pairs of a country without labels join BOTH judges' training rows.
+    # PSEUDO: pairs of the train split (a held-out country, whose true labels are never used); PSEUDO_TEST: of the test split
+    trA, trB, w, extra = gA.copy(), gB.copy(), None, None
+    if os.environ.get("PSEUDO"):
+        idx, yp = _pseudo(keys, os.environ["PSEUDO"])
+        y = y.copy(); y[idx] = yp
+        trA[idx] = trB[idx] = True
+        w = np.ones(len(y)); w[idx] = PSEUDO_W
+        print(f"pseudo-labelled train pairs: {len(idx):,} ({yp.mean():.1%} positive), weight {PSEUDO_W}", flush=True)
+    if os.environ.get("PSEUDO_TEST"):
+        kt0, Ft0 = stage1_data("test")
+        idx, yp = _pseudo(kt0, os.environ["PSEUDO_TEST"])
+        extra = (Ft0.iloc[idx].reset_index(drop=True), yp, np.full(len(idx), PSEUDO_W))
+        del kt0, Ft0
+        print(f"pseudo-labelled test pairs: {len(idx):,} ({yp.mean():.1%} positive), weight {PSEUDO_W}", flush=True)
     params = dict(objective="binary", learning_rate=0.05, num_leaves=255, min_data_in_leaf=200, feature_fraction=0.8,
                   bagging_fraction=0.5, bagging_freq=1, num_threads=NT, verbose=-1, seed=0)
     models = {}
-    for name, tr, va in [("A", gA, gB), ("B", gB, gA)]:
-        m = lgb.train(params, lgb.Dataset(F[tr], y[tr]), 4000, valid_sets=[lgb.Dataset(F[va], y[va])],
+    for name, tr, va in [("A", trA, gB), ("B", trB, gA)]:
+        Xt, yt = F[tr], y[tr]
+        wt = None if w is None and extra is None else (np.ones(tr.sum()) if w is None else w[tr])
+        if extra is not None:
+            Xt, yt, wt = pd.concat([Xt, extra[0]], ignore_index=True), np.r_[yt, extra[1]], np.r_[wt, extra[2]]
+        m = lgb.train(params, lgb.Dataset(Xt, yt, weight=wt), 4000, valid_sets=[lgb.Dataset(F[va], y[va])],
                       callbacks=[lgb.early_stopping(50), lgb.log_evaluation(200)])
+        del Xt
         m.save_model(f"{XD}/gbm5_{name}{TAG}.txt"); models[name] = m
         print(name, "best iter", m.best_iteration, flush=True)
     print(pd.Series(models["A"].feature_importance("gain"), index=F.columns).sort_values(ascending=False)
