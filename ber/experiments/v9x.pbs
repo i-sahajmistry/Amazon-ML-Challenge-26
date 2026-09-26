@@ -13,10 +13,10 @@
 #          split, claimed by whichever GPU is free)
 #   CPU:   stage 1 with bge (v9 stack and the France self-trained stack), stage 2 (5 seeds, house-number peers) per variant, x_final, validator. Submissions in $R/output_v9x_*:
 #          0 = v9p_frand rebuilt from its files (must equal the leaderboard file), a = + LLM (France), b = + bge,
-#          c = + bge + LLM (France). US / India always come from a stack without the LLM; France: the LLM stack,
+#          c = + bge + LLM (France); made in the order 0, b, c, a (the LLM runs on the GPU meanwhile). US / India always come from a stack without the LLM; France: the LLM stack,
 #          vetoed by the self-trained stack (v9p_frand's rule).
 # Resumable: every step leaves $R/work/logs/<step>.ok; a resubmission skips finished steps and finished LLM shards.
-# PHASE=gpu stops after the GPU work (bge, LLM), for a first job with few CPUs; the same script without PHASE then
+# PHASE=llm runs only the LLM (gate, shards); PHASE=gpu stops after the GPU work (bge, LLM), for a first job with few CPUs; the same script without PHASE then
 # does stage 1 / 2 and the files (and any GPU step left over, on its one GPU).
 # Needs the bge model in $BGE (hf download BAAI/bge-reranker-v2-m3 --local-dir $BGE, by the user with the proxy);
 # GPU 0 waits for it up to 2 h, and without it only files 0 and a are made.
@@ -81,56 +81,47 @@ wait_gate() {   # 0 once the LLM gate passed, 1 if it failed
 }
 
 BGEV=(CE_BASE=$BGE CE_DIR=$X/ce_bge CE_TEXT=orig CE_TAG=_bge)
-gpu0() {
+BGE_TRIED=$L/bge_tried.${PBS_JOBID:-local}
+bge_part() {   # bge on GPU 0: wait for the download (up to 2 h), fine-tune, score test and train
     local i
-    for i in $(seq 1 240); do   # the bge download (up to 2 h; not when bge is already done)
+    for i in $(seq 1 240); do
         [ -e "$L/bge_score_train.ok" ] && break
         [ -e "$BGE/model.safetensors" ] && [ -e "$BGE/tokenizer.json" ] && \
             [ "$(ls "$BGE"/.cache/huggingface/download/*.incomplete 2>/dev/null | wc -l)" = 0 ] && break
         [ $((i % 10)) = 1 ] && echo "waiting for the bge model in $BGE $(date +%T)"
         sleep 30
     done
-    if [ -e "$BGE/model.safetensors" ] && \
-       run bge_train "CUDA_VISIBLE_DEVICES=$G0" "${BGEV[@]}" CE_N=3000000 CE_BS=256 CE_LR=2e-5 -- x_ce3.py train && \
-       run bge_score_test "CUDA_VISIBLE_DEVICES=$G0" "${BGEV[@]}" -- x_ce3.py score test && \
-       run bge_score_train "CUDA_VISIBLE_DEVICES=$G0" "${BGEV[@]}" -- x_ce3.py score train; then
-        wait_gate && llm_shards "$G0"
-    else
-        echo "no bge stack (model missing or a bge step failed): GPU 0 helps the LLM"
-        wait_gate && llm_shards "$G0"
-    fi
-    return 0
+    [ -e "$BGE/model.safetensors" ] && \
+    run bge_train "CUDA_VISIBLE_DEVICES=$G0" "${BGEV[@]}" CE_N=3000000 CE_BS=256 CE_LR=2e-5 -- x_ce3.py train && \
+    run bge_score_test "CUDA_VISIBLE_DEVICES=$G0" "${BGEV[@]}" -- x_ce3.py score test && \
+    run bge_score_train "CUDA_VISIBLE_DEVICES=$G0" "${BGEV[@]}" -- x_ce3.py score train \
+        || echo "no bge stack (model missing or a bge step failed)"
+    touch "$BGE_TRIED"
 }
-gpu1() {
+gpu0() { bge_part; wait_gate && llm_shards "$G0"; return 0; }
+gpu1() {   # the LLM: selection, gate (it stops a broken judge, AUC ~0.5, not a weak one), shards
     run llm_select_train TAG=_v9 SEL=v8 LLM_MAX=200000 -- llm_judge.py select train &&
     run llm_select_test TAG=_v9 SEL=v8 LLM_COUNTRIES=unseen -- llm_judge.py select test &&
-    run llm_gate "CUDA_VISIBLE_DEVICES=$G1" LLM_SMOKE=2000 -- llm_judge.py score train \
+    run llm_gate "CUDA_VISIBLE_DEVICES=$G1" LLM_SMOKE=2000 LLM_GATE_AUC=${LLM_GATE_AUC:-0.55} -- llm_judge.py score train \
         || { touch "$L/llm_gate.failed"; echo "no LLM: the gate or the selection failed"; return 0; }
     llm_shards "$G1"
     return 0
 }
 rm -f "$L/llm_gate.failed"
-gpu0 > "$L/v9x_gpu0.log" 2>&1 & P0=$!
-gpu1 > "$L/v9x_gpu1.log" 2>&1 & P1=$!
-wait $P0; wait $P1
-cat "$L/v9x_gpu1.log" "$L/v9x_gpu0.log"
-if [ "${PHASE:-all}" = gpu ]; then echo "GPU phase done $(date +%T)"; exit 0; fi
-
-# ---------------------------------------------------------------- stage 2 per variant, submissions, validation
-HAVE_LLM=0; llm_parts_done && run llm_merge_train -- llm_judge.py merge train && run llm_merge_test -- llm_judge.py merge test && HAVE_LLM=1
-HAVE_BGE=0
-if [ -e "$L/bge_score_train.ok" ]; then   # stage 1 with the bge scores: v9 stack and France self-trained stack
-    S1V=(S1K=3 NT=$((NC / 2)))
-    ( run s1_v9g TAG=_v9g CE_TAGS=,_raw,_bge "${S1V[@]}" -- x_stage_multi.py s1 ) &
-    ( run s1_v9gs TAG=_v9gs CE_TAGS=_ns,_rs,_bge "${S1V[@]}" -- x_stage_multi.py s1 ) &
-    wait
-    [ -e "$L/s1_v9g.ok" ] && [ -e "$L/s1_v9gs.ok" ] && HAVE_BGE=1
+if [ "${PHASE:-all}" = llm ]; then   # only the LLM, on this job's GPU
+    gpu1 > "$L/v9x_llm.log" 2>&1; cat "$L/v9x_llm.log"; echo "LLM phase done $(date +%T)"; exit 0
 fi
-echo "LLM features: $HAVE_LLM   bge stack: $HAVE_BGE"
+gpu0 > "$L/v9x_gpu0.$PBS_JOBID.log" 2>&1 & P0=$!
+gpu1 > "$L/v9x_gpu1.$PBS_JOBID.log" 2>&1 & P1=$!
+if [ "${PHASE:-all}" = gpu ]; then
+    wait $P0; wait $P1; cat "$L"/v9x_gpu*."$PBS_JOBID".log; echo "GPU phase done $(date +%T)"; exit 0
+fi
+
+# ---------------------------------------------------------------- CPU work, while the GPU(s) finish bge / the LLM
 S2=(BAG=5 PEERS=1 "P2X={\"num_threads\": $((NC / 2))}")   # two stage-2 runs at a time
 V9C=(TAG=_v9 CE_TAGS=,_raw); V9S=(TAG=_v9s CE_TAGS=_ns,_rs)
 V9G=(TAG=_v9g CE_TAGS=,_raw,_bge); V9GS=(TAG=_v9gs CE_TAGS=_ns,_rs,_bge)
-
+s2() { local n=$1; shift; run "$n" "$@" -- x_nocopy.py test; }
 final() {   # final <name> <base q tag> <FROM spec>: submission + validator
     local n=$1 base=$2 from=$3 out=$R/output_v9x_$1
     [ -e "$L/final_$n.ok" ] && { echo "skip final_$n (done)"; return 0; }
@@ -138,25 +129,41 @@ final() {   # final <name> <base q tag> <FROM spec>: submission + validator
     (cd "$HOME/scratch/amlc_data/student_resource" && "$PY" utils/validate_submission.py \
         --matching "$out/matching_results.tsv" --candidate "$out/candidate_pairs.tsv" --test-dir dataset/test) \
         >> "$L/final_$n.log" 2>&1 || { echo "FAILED validation of $n"; tail -5 "$L/final_$n.log"; return 1; }
-    touch "$L/final_$n.ok"; echo "SUBMISSION $n ready: $out"; tail -3 "$L/final_$n.log"
+    touch "$L/final_$n.ok"; echo "SUBMISSION $n ready: $out $(date +%T)"; tail -3 "$L/final_$n.log"
 }
 
-s2() { local n=$1; shift; run "$n" "$@" -- x_nocopy.py test; }
 final 0 _v9pw "France:_v9spw:min"
-# stage-2 runs two at a time, in the order the files need them: c (bge + LLM) first, then a (LLM), then b (bge)
-B=$HAVE_BGE; M=$HAVE_LLM
-[ $B = 1 ] && ( s2 s2_v9gp "${V9G[@]}" "${S2[@]}" ) &
-[ $B = 1 ] && [ $M = 1 ] && ( s2 s2_v9gpL "${V9G[@]}" "${S2[@]}" LLM=1 S2TAG=L ) &
-wait
-[ $B = 1 ] && [ $M = 1 ] && ( s2 s2_v9gspL "${V9GS[@]}" "${S2[@]}" LLM=1 S2TAG=L ) &
-[ $M = 1 ] && ( s2 s2_v9pL "${V9C[@]}" "${S2[@]}" LLM=1 S2TAG=L ) &
-wait
-[ -e "$L/s2_v9gp.ok" ] && [ -e "$L/s2_v9gpL.ok" ] && [ -e "$L/s2_v9gspL.ok" ] && final c _v9gpw "France:_v9gpLw,France:_v9gspLw:min"
-[ $M = 1 ] && ( s2 s2_v9spL "${V9S[@]}" "${S2[@]}" LLM=1 S2TAG=L ) &
-[ $B = 1 ] && ( s2 s2_v9gsp "${V9GS[@]}" "${S2[@]}" ) &
-wait
-[ -e "$L/s2_v9pL.ok" ] && [ -e "$L/s2_v9spL.ok" ] && final a _v9pw "France:_v9pLw,France:_v9spLw:min"
-[ -e "$L/s2_v9gp.ok" ] && [ -e "$L/s2_v9gsp.ok" ] && final b _v9gpw "France:_v9gspw:min"
+until [ -e "$L/bge_score_train.ok" ] || [ -e "$BGE_TRIED" ]; do sleep 30; done
+HAVE_BGE=0
+if [ -e "$L/bge_score_train.ok" ]; then   # stage 1 with bge: the v9 stack and the France self-trained stack
+    S1V=(S1K=3 NT=$((NC / 2)))
+    ( run s1_v9g TAG=_v9g CE_TAGS=,_raw,_bge "${S1V[@]}" -- x_stage_multi.py s1 ) & A=$!
+    ( run s1_v9gs TAG=_v9gs CE_TAGS=_ns,_rs,_bge "${S1V[@]}" -- x_stage_multi.py s1 ) & B=$!
+    wait $A; wait $B
+    [ -e "$L/s1_v9g.ok" ] && [ -e "$L/s1_v9gs.ok" ] && HAVE_BGE=1
+fi
+echo "bge stack: $HAVE_BGE $(date +%T)"
+if [ $HAVE_BGE = 1 ]; then   # file b while the LLM runs
+    ( s2 s2_v9gp "${V9G[@]}" "${S2[@]}" ) & A=$!
+    ( s2 s2_v9gsp "${V9GS[@]}" "${S2[@]}" ) & B=$!
+    wait $A; wait $B
+    [ -e "$L/s2_v9gp.ok" ] && [ -e "$L/s2_v9gsp.ok" ] && final b _v9gpw "France:_v9gspw:min"
+fi
+wait $P0; wait $P1; cat "$L"/v9x_gpu*."$PBS_JOBID".log
+HAVE_LLM=0; llm_parts_done && run llm_merge_train -- llm_judge.py merge train && run llm_merge_test -- llm_judge.py merge test && HAVE_LLM=1
+echo "LLM features: $HAVE_LLM $(date +%T)"
+if [ $HAVE_LLM = 1 ] && [ $HAVE_BGE = 1 ]; then   # file c
+    ( s2 s2_v9gpL "${V9G[@]}" "${S2[@]}" LLM=1 S2TAG=L ) & A=$!
+    ( s2 s2_v9gspL "${V9GS[@]}" "${S2[@]}" LLM=1 S2TAG=L ) & B=$!
+    wait $A; wait $B
+    [ -e "$L/s2_v9gpL.ok" ] && [ -e "$L/s2_v9gspL.ok" ] && final c _v9gpw "France:_v9gpLw,France:_v9gspLw:min"
+fi
+if [ $HAVE_LLM = 1 ]; then   # file a
+    ( s2 s2_v9pL "${V9C[@]}" "${S2[@]}" LLM=1 S2TAG=L ) & A=$!
+    ( s2 s2_v9spL "${V9S[@]}" "${S2[@]}" LLM=1 S2TAG=L ) & B=$!
+    wait $A; wait $B
+    [ -e "$L/s2_v9pL.ok" ] && [ -e "$L/s2_v9spL.ok" ] && final a _v9pw "France:_v9pLw,France:_v9spLw:min"
+fi
 
 echo "==================== summary $(date +%T)"
 grep -h "fold-9 pair AUC\|argmax by" "$L/bge_train.log" 2>/dev/null
