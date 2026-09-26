@@ -6,11 +6,14 @@
 #PBS -l walltime=03:00:00
 # After v8_chain: in-country baseline for the leave-one-country-out run (loco_eval.py without HOLDOUT: F0.5, loss by
 # error kind and record outcomes per country on entity folds 8-9) and the label-free test score bands per country
-# (test_bands.py). Reads ~/scratch/amlc_v8; writes only logs. CPU only (scai_q requires a GPU).
+# (test_bands.py), plus retrieval of the held-out country with vs without it in the bi-encoder's training
+# (retrieval_unseen.py). Reads ~/scratch/amlc_v8 and ~/scratch/amlc_loco_india; writes only logs. CPU only (scai_q requires a GPU).
 # Submit:  qsub ~/scratch/ber_v8_loco/ber/experiments/v8_eval.pbs
 PY=${PY:-$HOME/scratch/miniconda3/envs/amlc312/bin/python}
 set -ex
 export AMLC_ROOT=${RUNDIR:-$HOME/scratch/amlc_v8} SHORTLIST=learned:0.001 NT=8 NCPUS=8
 cd "${CODE:-$HOME/scratch/ber_v8_loco}/ber/src"
+NORMAL=$HOME/scratch/amlc_v8/work LOCO=$HOME/scratch/amlc_loco_india/work HOLDOUT_NAME=India \
+    "$PY" -u retrieval_unseen.py || true   # diagnostic only; never block the rest
 TAG=_v8w "$PY" -u test_bands.py
 TAG=_v8 CE_TAGS=,_raw WORDS=1 "$PY" -u loco_eval.py
