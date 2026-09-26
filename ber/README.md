@@ -28,23 +28,26 @@ country or a language.
    the test share (39%), five seeds.
 6. **v10** (`DFOLD=1`): a distractor takes the fold of the S1 it imitates, so every entity keeps all its distractors;
    both cross-encoders retrained, then stages 1–2 as above.
-7. **Self-training for the country without training labels** (France; `x_ce3.py train` with `SELF=`): both
+7. **Self-training for the countries without training labels** (test countries with no labelled training record,
+   found from the data by `common.unlabelled()`: France here; `x_ce3.py train` with `SELF=`): both
    cross-encoders are continued on test pairs whose earlier decision was confident (q ≥ 0.98: the best S1 is a match and
    the record's other top-5 candidates are not; q ≤ 0.02: none is), mixed with train pairs. Three rounds (v9s seeded by
-   v8, v9s2 by v9p_frand, v10s3 by v10_fr2), each restacked; each acts as a veto: a France record is accepted only if
-   every stack accepts it for the same S1 (`x_final.py FROM=France:<tag>:min`). No labels are used; the organisers' Q&A
+   v8, v9s2 by v9p_frand, v10s3 by v10_fr2), each restacked; each acts as a veto: such a record is accepted only if
+   every stack accepts it for the same S1 (`x_final.py FROM=unlabelled:<tag>:min`). No labels are used; the organisers' Q&A
    allows self-training on the test records.
 8. **LLM judge** (`x_llm.py`, `x_llmstack.py`): `Qwen/Qwen3-Reranker-4B` with a LoRA (r 16) trained on 120k train
    records of folds 4–7 whose stage-1 p is unsure; its yes − no margin is blended with the stage-2 score by a logistic
    regression fitted on validation, for unsure records only.
-9. **France same-address fixes** (`wstat.py`, `rule_fr.py`, `x_rule1.py`, `x_anatomy.py`, `x_census.py`, `x_wordlists.py`):
+9. **Same-address fixes for the countries without labels** (`x_ddfix.py`, with `rule_fr.py`, `wstat.py`, `x_anatomy.py`):
    decoys copy an S1's name with one edit and move to a shifted house number; each S1 gets a roughly fixed number of
    them, so a decoy placed at the S1's own address leaves its shifted cluster short. For every word added at the same
    address, the spread of those records over the S1's records at other numbers is compared with unedited records
    (total variation distance): TV ≤ 0.10 is true-like, TV ≥ 0.20 decoy-like (on US / India validation 98.7% / 90.8% and
    22.5% true). Records the structural rule accepts (same house number and sub-number, the S1's distinctive street
    words, first and rarest core-name word, no decoy word by the house-number word statistic) whose added words are all
-   true-like are restored; accepted same-address records adding a decoy-like word are rejected.
+   true-like are restored; accepted same-address records adding a decoy-like word are rejected. Where labels exist the
+   models already get these right and the same fixes would hurt (`python x_ddfix.py check`: India would lose 0.0024),
+   so they apply only to the countries without labels.
 10. **Decision** (`x_final.py`): accept a record when its score is ≥ 0.70, the same threshold for every country.
 
 Folds: `crc32(S1 id) % 10`; 0–3 train the bi-encoder and the cross-encoders, 4–9 stages 1 and 2; stage 2 is validated

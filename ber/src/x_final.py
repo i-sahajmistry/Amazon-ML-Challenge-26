@@ -1,14 +1,15 @@
 """Assemble a submission from a model's test-time stage-2 probabilities (x/test_q{TAG}.parquet, written by
 x_nocopy.py test or x_thr.py): each record goes to its best S1 when q >= THR. One rule for every country.
   python x_final.py OUT_DIR [TAG] [THR]     # TAG "v5" = untagged (run.sh drops empty args)
-  FROM=France:_v9sw[:min] THR_C=France:0.8 ...  # one country's q from another model (or the min of both) /
-                                            # its own threshold
+  FROM=unlabelled:_v9sw[:min] THR_C=France:0.8  # one country's q from another model (or the min of both) /
+                                            # its own threshold; 'unlabelled' = the countries without
+                                            # training labels (common.unlabelled), or name a country
   NUMVETO=US,France MAXD=13 ...            # reject decoy groups at a shifted house number (see below)
   BLANK=<country> python x_final.py ...    # leaderboard probe: that country's S1s left empty, so the score
                                             # difference to the full file isolates that country
   python x_final.py sweep [TAG]             # per country: S1s with no match / matches per S1, by threshold"""
 import os, sys, numpy as np, pandas as pd
-from common import WORK, load
+from common import WORK, load, countries
 from match import to_sets, write_tsv
 
 OUT = sys.argv[1]
@@ -16,8 +17,15 @@ TAG = sys.argv[2] if len(sys.argv) > 2 else "v5"
 TAG = "" if TAG == "v5" else TAG
 THR = float(sys.argv[3]) if len(sys.argv) > 3 else 0.70
 
+
+def specs(env):
+    """'unlabelled:REST' -> one 'C:REST' per country without training labels; 'C:REST' as given"""
+    return [f"{k}:{rest}" for spec in filter(None, os.environ.get(env, "").split(","))
+            for c, rest in [spec.split(":", 1)] for k in countries(c)]
+
+
 d = pd.read_parquet(f"{WORK}/x/test_q{TAG}.parquet")
-for spec in filter(None, os.environ.get("FROM", "").split(",")):   # "France:_v9sw": that country's q from another model
+for spec in specs("FROM"):                                          # "France:_v9sw": that country's q from another model
     c, t, *mode = spec.split(":")                                   # "France:_v9sw:min": accept only what both models
     e = pd.read_parquet(f"{WORK}/x/test_q{t}.parquet")              # accept, for the same S1
     e = e[e.c == c]
@@ -64,7 +72,7 @@ for f in filter(None, os.environ.get("REJECT", "").split(",")):    # x/reject_*.
     print(f"reject {f}: {k.sum()} records, {(k & (d.q.values >= THR)).sum()} of them accepted before", flush=True)
     d.loc[k, "q"] = 0.0
 thr = np.full(len(d), THR)
-for spec in filter(None, os.environ.get("THR_C", "").split(",")):  # "France:0.8": that country's threshold
+for spec in specs("THR_C"):                                        # "France:0.8": that country's threshold
     c, t = spec.split(":")
     thr[d.c.values == c] = float(t)
 acc = d.q.values >= thr

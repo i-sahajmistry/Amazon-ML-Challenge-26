@@ -14,7 +14,7 @@ LLM_TAG (output suffix), SELF_N (pseudo-labelled pairs), SELF_C (countries; defa
 import os, sys, math, time, numpy as np, pandas as pd, torch
 import torch.nn.functional as Fn
 from transformers import AutoTokenizer, AutoModelForCausalLM
-from common import WORK, load
+from common import WORK, load, countries
 from harness import truth_arrays, wscore
 
 XD = f"{WORK}/x"
@@ -176,8 +176,8 @@ def stack_check(v, ts, s1f):
 def test():
     d = pd.read_parquet(f"{XD}/test_q{QT}w.parquet")
     band = (d.q.values > LO) & (d.q.values < HI)
-    if os.environ.get("COUNTRY"):                  # e.g. COUNTRY=France: score that country's unsure rows only
-        band &= d.c.isin(os.environ["COUNTRY"].split(",")).values
+    if os.environ.get("COUNTRY"):                  # e.g. COUNTRY=unlabelled: those countries' unsure rows only
+        band &= d.c.isin(countries(os.environ["COUNTRY"])).values
     T1, T2 = texts("test")
     m = model("load")
     llm = np.full(len(d), np.nan, np.float32)
@@ -198,7 +198,7 @@ def extend():
         d = d.merge(s, on=["rid", "sid"], how="left")
         band = (d.q.values > LO) & (d.q.values < HI)
         if split == "test" and os.environ.get("COUNTRY"):
-            band &= d.c.isin(os.environ["COUNTRY"].split(",")).values
+            band &= d.c.isin(countries(os.environ["COUNTRY"])).values
         need = band & ~np.isfinite(d.llm.values)
         print(f"{split}: unsure rows {band.sum()}, already scored {(band & np.isfinite(d.llm.values)).sum()}, "
               f"to score {need.sum()}", flush=True)

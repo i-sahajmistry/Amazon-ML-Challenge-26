@@ -1,4 +1,4 @@
-"""Structural acceptance for a country without training labels (France). A record is taken as true, whatever else
+"""Structural acceptance for a country without training labels (France here). A record is taken as true, whatever else
 its name changes, when it keeps all of these from its S1:
 - the house number, suffix included (20 and 20 bis differ);
 - the second number of a compound (102-21 vs 102-42; India plot numbers);
@@ -7,13 +7,14 @@ its name changes, when it keeps all of these from its S1:
 and it adds no decoy word (house-number word statistic z < ZMAX, wstat.py).
 On US / India validation such records are > 99% true matches (decoys move to a shifted number). Models trained on
 US / India text reject French type-word swaps and suffixes at the same address ("Mc Soins" -> "Mc Groupement [SA]").
-  python rule_fr.py BASE_TAG [COUNTRY]   -> x/test_q_rule{BASE_TAG}.parquet: q = 1 for those records (S1 from
-                                            BASE_TAG), else 0; combine with x_final FROM=France:_rule{BASE_TAG}:max
-  python rule_fr.py val                  -> the same rule on US / India validation folds 8-9, with labels"""
+  python rule_fr.py BASE_TAG [COUNTRIES]  -> x/test_q_rule{BASE_TAG}.parquet: q = 1 for those records (S1 from
+                                             BASE_TAG), else 0. COUNTRIES: comma-separated, default 'unlabelled' (the
+                                             countries without training labels, common.unlabelled)
+  python rule_fr.py val                   -> the same rule on US / India validation folds 8-9, with labels"""
 import os, re, sys, numpy as np, pandas as pd
 from collections import Counter
 from rapidfuzz import fuzz
-from common import WORK, load, norm_addr
+from common import WORK, load, norm_addr, countries
 from match import normed
 
 XD = f"{WORK}/x"
@@ -103,9 +104,9 @@ if __name__ == "__main__":
             print(f"{c}: rule records {m.sum()}, true {y[m].mean():.4f}; model-rejected {(m & rej).sum()}, true there "
                   f"{y[m & rej].mean():.4f}; decoys in rule {(m & (ts[b.rid.values] < 0)).sum()}", flush=True)
         sys.exit()
-    TAG, C = sys.argv[1], (sys.argv[2] if len(sys.argv) > 2 else "France")
+    TAG, C = sys.argv[1], countries(sys.argv[2] if len(sys.argv) > 2 else "unlabelled")
     d = pd.read_parquet(f"{XD}/test_q{TAG}.parquet")
-    d = d[d.c == C].reset_index(drop=True)
+    d = d[d.c.isin(C)].reset_index(drop=True)
     ok = rule("test", d)
     print(f"{C}: records {len(d)}, rule accepts {ok.sum()}, of which below 0.70 now {(ok & (d.q.values < 0.7)).sum()}", flush=True)
     d.assign(q=ok.astype(np.float32))[["rid", "sid", "q", "c"]].to_parquet(f"{XD}/test_q_rule{TAG}.parquet")
