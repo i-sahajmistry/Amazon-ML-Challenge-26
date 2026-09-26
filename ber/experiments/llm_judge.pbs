@@ -2,7 +2,7 @@
 #PBS -N llm_judge
 #PBS -P scai
 #PBS -q scai_q
-#PBS -l select=1:ncpus=8:ngpus=4:mem=200gb
+#PBS -l select=1:ncpus=8:ngpus=2:mem=200gb
 #PBS -l walltime=06:00:00
 # LLM judge scores for a finished run: select the uncertain / ambiguous records, score their best candidates with a local
 # open-weight LLM (one process per GPU PBS gave the job), merge. A gate runs first: 2,000 random labelled train pairs
@@ -30,6 +30,15 @@ SPL=${SPLITS:-test train}
 for split in $SPL; do
     "$PY" -u llm_judge.py select "$split" 2>&1 | tee "$L/llm_select_$split.log"
 done
+# the model may still be downloading: wait for every weight file (up to 45 min)
+for i in $(seq 1 90); do
+    need=$("$PY" -c "import json; print(len(set(json.load(open('$LLM_MODEL/model.safetensors.index.json'))['weight_map'].values())))" 2>/dev/null || echo 999)
+    have=$(ls "$LLM_MODEL"/model-*-of-*.safetensors 2>/dev/null | wc -l || true)   # || true: an empty ls must not end the job
+    inc=$(ls "$LLM_MODEL"/.cache/huggingface/download/*.incomplete 2>/dev/null | wc -l || true)
+    [ "$have" = "$need" ] && [ "$inc" = 0 ] && break
+    echo "waiting for the model download ($have/$need weight files, $inc in progress) $(date +%T)"; sleep 30
+done
+[ "$have" = "$need" ] && [ "$inc" = 0 ] || { echo "model not downloaded: $LLM_MODEL"; exit 1; }
 # gate on labelled train pairs (needs the train selection; for a test-only run select train just for the gate)
 [[ " $SPL " == *" train "* ]] || "$PY" -u llm_judge.py select train > "$L/llm_select_train_gate.log" 2>&1
 ${G[0]:+env CUDA_VISIBLE_DEVICES=${G[0]}} LLM_SMOKE=${GATE_N:-2000} "$PY" -u llm_judge.py score train \
