@@ -16,7 +16,7 @@ set -ex
 H=${HOLDOUT:-India}
 R=${RUNDIR:-$HOME/scratch/amlc_loco_$(echo "$H" | tr '[:upper:]' '[:lower:]')}
 OLD=$HOME/scratch/AmazonMLChallenge/work
-mkdir -p "$R/work/pq" "$R/work/logs"
+mkdir -p "$R/work/pq" "$R/work/logs" "$R/work/x"   # x/: x_feats writes there before any step creates it
 ln -sfn "$HOME/scratch/amlc_data/student_resource" "$R/student_resource"
 ln -sfn "$OLD/cand_test.parquet" "$R/work/cand_test.parquet"   # label-free test pairs, read by mine_dicts / words
 for f in "$OLD"/pq/train_source*.parquet "$OLD"/pq/test_source*.parquet "$OLD"/pq/train_ground_truth.parquet; do

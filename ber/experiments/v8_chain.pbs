@@ -13,7 +13,7 @@ PY=${PY:-$HOME/scratch/miniconda3/envs/amlc312/bin/python}
 set -ex
 R=${RUNDIR:-$HOME/scratch/amlc_v8}
 OLD=$HOME/scratch/AmazonMLChallenge/work
-mkdir -p "$R/work/pq" "$R/work/logs"
+mkdir -p "$R/work/pq" "$R/work/logs" "$R/work/x"   # x/: x_feats writes there before any step creates it
 ln -sfn "$HOME/scratch/amlc_data/student_resource" "$R/student_resource"
 ln -sfn "$OLD/cand_train.parquet" "$R/work/cand_train.parquet"
 ln -sfn "$OLD/cand_test.parquet" "$R/work/cand_test.parquet"
