@@ -2,7 +2,7 @@
 #PBS -N loco
 #PBS -P scai
 #PBS -q scai_q
-#PBS -l select=1:ncpus=8:ngpus=2:mem=400gb
+#PBS -l select=1:ncpus=8:ngpus=1:mem=400gb
 #PBS -l walltime=08:00:00
 # Leave-one-country-out v8 (a labelled stand-in for France): with HOLDOUT=<country> no step trains on that train
 # country (common.s1_fold gives it fold 10). Rebuilds everything that learns from labels without it: bi-encoder,
@@ -26,6 +26,13 @@ export AMLC_ROOT=$R HOLDOUT=$H SKIP_TEST=1 SHORTLIST=learned:0.001 NT=8 NCPUS=8 
 export E5=${E5:-/scratch/scai/mtech/aib262045/hf/hub/models--intfloat--multilingual-e5-small/snapshots/614241f622f53c4eeff9890bdc4f31cfecc418b3}
 L=$R/work/logs
 V8="TAG=_v8 CE_TAGS=,_raw WORDS=1"
+# only the GPUs PBS gave this job: with one, both cross-encoders share it
+if [ -n "${CUDA_VISIBLE_DEVICES:-}" ]; then
+    G=(${CUDA_VISIBLE_DEVICES//,/ }); D0="CUDA_VISIBLE_DEVICES=${G[0]}"; D1="CUDA_VISIBLE_DEVICES=${G[1]:-${G[0]}}"
+else
+    D0="GPU_FROM_PBS=unset"; D1=$D0   # PBS set nothing: leave the device choice alone
+fi
+echo "GPUs from PBS: ${CUDA_VISIBLE_DEVICES:-unset} -> $D0 / $D1"
 nvidia-smi || true
 cd "${CODE:-$HOME/scratch/ber_v8_loco}/ber/src"
 set +x
@@ -39,19 +46,19 @@ run() {   # run <step> <env assignments...> -- <script> <args...>
     touch "$L/$n.ok"; echo "done $n $(date +%T)"
 }
 
-run train_embed CUDA_VISIBLE_DEVICES=0 -- train_embed.py
-run retrieve CUDA_VISIBLE_DEVICES=0 -- retrieve.py train
+run train_embed $D0 -- train_embed.py
+run retrieve $D0 -- retrieve.py train
 run mine_dicts -- mine_dicts.py
 run prep_norm -- prep_norm.py
 run shortlist -- shortlist.py
 run stage1_v4 -- stage1_cv.py
-# CPU features, the word model and the two cross-encoders in parallel (GPU 0: words then CE, GPU 1: raw-text CE)
+# CPU features, the word model and the two cross-encoders in parallel (G0: words then CE, G1: raw-text CE)
 ( run x_feats -- x_feats.py train ) & P1=$!
-( run words CUDA_VISIBLE_DEVICES=0 -- words.py &&
-  run ce_train CUDA_VISIBLE_DEVICES=0 CE_N=12000000 -- x_ce.py train &&
-  run ce_score CUDA_VISIBLE_DEVICES=0 -- x_ce.py score train ) & P2=$!
-( run ce_raw_train CUDA_VISIBLE_DEVICES=1 CE_TEXT=raw CE_DIR=$R/work/x/ce_raw CE_N=12000000 -- x_ce3.py train &&
-  run ce_raw_score CUDA_VISIBLE_DEVICES=1 CE_TEXT=raw CE_DIR=$R/work/x/ce_raw CE_TAG=_raw -- x_ce3.py score train ) & P3=$!
+( run words $D0 -- words.py &&
+  run ce_train $D0 CE_N=12000000 -- x_ce.py train &&
+  run ce_score $D0 -- x_ce.py score train ) & P2=$!
+( run ce_raw_train $D1 CE_TEXT=raw CE_DIR=$R/work/x/ce_raw CE_N=12000000 -- x_ce3.py train &&
+  run ce_raw_score $D1 CE_TEXT=raw CE_DIR=$R/work/x/ce_raw CE_TAG=_raw -- x_ce3.py score train ) & P3=$!
 wait $P1 && wait $P2 && wait $P3 || { echo "a parallel step failed"; exit 1; }
 run stage1 $V8 -- x_stage_multi.py s1
 run loco_eval $V8 -- loco_eval.py
