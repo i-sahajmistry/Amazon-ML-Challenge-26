@@ -15,6 +15,18 @@ def truth_arrays():
     s1f = s1_fold(s1.entity_id.tolist()); rf = s1_fold(other.entity_id.tolist()); rf[ts >= 0] = s1f[ts[ts >= 0]]
     return s1, other, ts, s1f, rf
 
+def wscore(sid, acc, tru, wt, T, ents):
+    """harness.score with weighted false positives (a distractor row counts W times)."""
+    n = len(T)
+    tp = np.bincount(sid[acc & tru], minlength=n)[ents]
+    fp = np.bincount(sid[acc & ~tru], weights=wt[acc & ~tru], minlength=n)[ents]
+    t = T[ents]
+    pr = np.divide(tp, tp + fp, out=np.zeros(len(t)), where=tp + fp > 0)
+    rc = tp / np.maximum(t, 1)
+    f = np.divide(1.25 * pr * rc, 0.25 * pr + rc, out=np.zeros(len(t)), where=tp > 0)
+    return np.where(t == 0, (tp + fp == 0).astype(float), f).mean()
+
+
 def build(k, ts, s1f, rf, eval_folds=(9,), dis_folds=(0, 1, 2, 3, 9), share=0.39, seed=0):
     matched = ts >= 0
     best = assign(k[["rid", "sid"]], k.p.values, 0.0)

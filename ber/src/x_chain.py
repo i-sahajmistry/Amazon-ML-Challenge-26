@@ -35,6 +35,37 @@ PLANS = {
            ("x_v7_thr", ["x_thr.py", "_all"], {})],
 }
 PLANS["rawv7"] = PLANS["raw"] + PLANS["v7"]   # raw CE, then the three-CE stages
+# v8 = scalable blocking + no hand-written tables. v8a: FAISS HNSW retrieval, the learned per-country lexicon and the
+# calibrated shortlist model (read its recall / size report, then pick SHORTLIST for v8b).
+PLANS["v8a"] = [("v8_retrieve_train", ["retrieve.py", "train"], {"ANN": "hnsw"}),
+                ("v8_retrieve_test", ["retrieve.py", "test"], {"ANN": "hnsw"}),
+                ("v8_lexicon", ["lexicon.py"], {}),
+                ("v8_shortlist", ["shortlist.py"], {})]
+# v8b: features on the shortlisted pairs, the normalised-text CE retrained (the raw-text CE only re-scores; the e5-base
+# CE is dropped: +0.00003 in v6), stage 1 with both CEs, stage 2 without distractor copies -> x/test_q_v8w
+_SL = os.environ.get("SHORTLIST", "model:0.005")
+PLANS["v8b"] = [
+    ("v8_features", ["-c", "from match import features; features('train'); features('test')"], {"SHORTLIST": _SL}),
+    ("v8_extra", ["-c", "import x_feats; x_feats.main('train'); x_feats.main('test')"], {}),
+    ("v8_stage1v4", ["stage1_cv.py"], {}),              # v4 stage-1 p, used by the CE sanity checks
+    ("v8_ce_train", ["x_ce.py", "train"], {"CE_N": "12000000"}),
+    ("v8_ce_score_train", ["x_ce.py", "score", "train"], {}),
+    ("v8_ce_score_test", ["x_ce.py", "score", "test"], {}),
+    # the raw-text CE of the v8 run was the v7 one (trained on the exact-search top-5); this retrains it from scratch
+    ("v8_raw_train", ["x_ce3.py", "train"], {"CE_TEXT": "raw", "CE_DIR": f"{WORK}/x/ce_raw", "CE_N": "12000000"}),
+    ("v8_raw_score_train", ["x_ce3.py", "score", "train"], {"CE_TEXT": "raw", "CE_DIR": f"{WORK}/x/ce_raw", "CE_TAG": "_raw"}),
+    ("v8_raw_score_test", ["x_ce3.py", "score", "test"], {"CE_TEXT": "raw", "CE_DIR": f"{WORK}/x/ce_raw", "CE_TAG": "_raw"}),
+    ("v8_s1", ["x_stage_multi.py", "s1"], {"TAG": "_v8", "CE_TAGS": ",_raw"}),
+    ("v8_s2", ["x_nocopy.py", "test"], {"TAG": "_v8", "CE_TAGS": ",_raw"})]
+# v9 experiments on the v8 features: error breakdown, shortlist with text similarities, and stages with 3 / 6 stage-1
+# fold groups and a 5-seed stage 2 (compare the copy-free validation printed by x_nocopy with v8's)
+_V9 = {"CE_TAGS": ",_raw"}
+PLANS["v9"] = [("v9_verr", ["x_verr.py", "_v8"], {}),
+               ("v9_shortlist2", ["x_shortlist2.py"], {}),
+               ("v9_s1_k3", ["x_stage_multi.py", "s1"], {**_V9, "TAG": "_v9k3", "S1K": "3"}),
+               ("v9_s2_k3", ["x_nocopy.py", "test"], {**_V9, "TAG": "_v9k3", "BAG": "5"}),
+               ("v9_s1_k6", ["x_stage_multi.py", "s1"], {**_V9, "TAG": "_v9k6", "S1K": "6"}),
+               ("v9_s2_k6", ["x_nocopy.py", "test"], {**_V9, "TAG": "_v9k6", "BAG": "5"})]
 ARGS = sys.argv[1:]
 PLAN = ARGS.pop(0) if ARGS and ARGS[0] in PLANS else "v5"   # python x_chain.py [plan] [first_step]
 STEPS = PLANS[PLAN]

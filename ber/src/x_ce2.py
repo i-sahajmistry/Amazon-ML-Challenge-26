@@ -116,11 +116,16 @@ def train():
     A, B = store("train", "s1"), store("train", "other")
     k = pd.read_parquet(f"{WORK}/feats2_train.parquet", columns=["rid", "sid"])
     r, s = k.rid.values, k.sid.values
-    sel = np.flatnonzero(rf[r] < 4)
+    # training pairs: the retrieved top-5 of S1 folds 0-3, not the matcher's shortlist, so the CE keeps seeing
+    # wrong-S1 candidates as negatives whatever the shortlist keeps
+    c = pd.read_parquet(f"{WORK}/cand_train.parquet", columns=["rid", "sid", "rank"])
+    c = c[(c["rank"].values < 5) & (rf[c.rid.values] < 4)]
+    cr, cs = c.rid.values, c.sid.values
+    sel = np.arange(len(cr))
     rng = np.random.default_rng(0)
     if NMAX and NMAX < len(sel):
         sel = rng.choice(sel, NMAX, replace=False)
-    a, b, y = s[sel], r[sel], ts[r[sel]] == s[sel]
+    a, b, y = cs[sel], cr[sel], ts[cr[sel]] == cs[sel]
     lens = plen(A, B, a, b)
     batches = [bt for _ in range(math.ceil(EPOCHS)) for bt in bucketed(lens, BS, rng)]
     batches = batches[:int(len(batches) * EPOCHS / math.ceil(EPOCHS))]

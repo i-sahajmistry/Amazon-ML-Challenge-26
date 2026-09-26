@@ -9,6 +9,7 @@ from common import WORK, ROOT, load
 from harness import truth_arrays, score
 from match import to_sets, write_tsv
 from stage2 import best_rows, context, S1F, PARAMS as P2
+import x_feats as XF
 
 XD = f"{WORK}/x"
 SHARE = float(os.environ.get("SHARE", 0.39))
@@ -17,9 +18,12 @@ NOCE = bool(os.environ.get("NOCE"))   # baseline: v4 stage 1, no CE features, sa
 TAG = "_noce" if NOCE else os.environ.get("TAG", "")   # suffix for stage-2 artefacts
 CE_TAGS = os.environ.get("CE_TAGS", "").split(",")   # x/ce{tag}_{split}.npy files, e.g. ",_base" = small + base
 CEF = [] if NOCE else [f"ce{t}{c}" for t in CE_TAGS for c in ("", "_rank", "_gap", "_s1_rank", "_s1_npos")]
-EXF = [] if NOCE or os.environ.get("NOEXTRA") else [  # x_feats.py
-    "int_first_eq", "int_a0_in_b", "int_a0_mindiff", "int_jacc", "int_a_only", "int_b_only",
-    "legal_added", "legal_dropped", "legal_a", "legal_b", "legal_xor"]
+EXF = [] if NOCE or os.environ.get("NOEXTRA") else [c for c in XF.COLS   # x_feats.py; EXF_DROP=a,b ablates columns
+                                                      if c not in os.environ.get("EXF_DROP", "").split(",")]
+# stage-1 cross-fitting over the S1 folds 4-9: S1K=2 (two models, as v5-v8), 3 or 6 (each model sees more data,
+# test averages more models)
+S1K = int(os.environ.get("S1K", 2))
+GROUPS = {2: [[4, 5, 6], [7, 8, 9]], 3: [[4, 5], [6, 7], [8, 9]], 6: [[f] for f in range(4, 10)]}[S1K]
 LLRF = [f"{f}_{e}_{t}" for f in ("n", "a") for e in ("add", "drop") for t in ("sum", "min", "max", "cnt")]     if os.environ.get("LLR") else []   # x_llr.py word-edit log-likelihood ratios
 
 
@@ -65,22 +69,26 @@ def s1():
     keys, F = stage1_data("train")
     y = ts[keys.rid.values] == keys.sid.values
     kf = rf[keys.rid.values]
-    gA, gB = np.isin(kf, [4, 5, 6]), np.isin(kf, [7, 8, 9])
+    grp = [np.isin(kf, g) for g in GROUPS]
     params = dict(objective="binary", learning_rate=0.05, num_leaves=255, min_data_in_leaf=200, feature_fraction=0.8,
                   bagging_fraction=0.5, bagging_freq=1, num_threads=32, verbose=-1, seed=0)
-    models = {}
-    for name, tr, va in [("A", gA, gB), ("B", gB, gA)]:
-        m = lgb.train(params, lgb.Dataset(F[tr], y[tr]), 4000, valid_sets=[lgb.Dataset(F[va], y[va])],
+    models = []
+    for i, g in enumerate(grp):   # model i learns the other groups, is early-stopped on and predicts group i
+        tr = np.any([grp[j] for j in range(len(grp)) if j != i], axis=0)
+        m = lgb.train(params, lgb.Dataset(F[tr], y[tr]), 4000, valid_sets=[lgb.Dataset(F[g], y[g])],
                       callbacks=[lgb.early_stopping(50), lgb.log_evaluation(200)])
-        m.save_model(f"{XD}/gbm5_{name}{TAG}.txt"); models[name] = m
-        print(name, "best iter", m.best_iteration, flush=True)
-    print(pd.Series(models["A"].feature_importance("gain"), index=F.columns).sort_values(ascending=False)
+        m.save_model(f"{XD}/gbm5_k{S1K}_{i}{TAG}.txt"); models.append(m)
+        print("model", i, "held-out folds", GROUPS[i], "best iter", m.best_iteration, flush=True)
+    print(pd.Series(models[0].feature_importance("gain"), index=F.columns).sort_values(ascending=False)
           .round(0).head(20).to_string(), flush=True)
-    pA, pB = models["A"].predict(F, num_threads=32), models["B"].predict(F, num_threads=32)
-    keys.assign(p=np.where(gB, pA, np.where(gA, pB, (pA + pB) / 2)).astype(np.float32)).to_parquet(f"{XD}/oof5_train{TAG}.parquet")
-    del F
+    P = np.column_stack([m.predict(F, num_threads=32) for m in models])
+    oof = P.mean(axis=1)                  # records of folds 0-3 (no model is out of fold for them): the mean
+    for i, g in enumerate(grp):
+        oof[g] = P[g, i]
+    keys.assign(p=oof.astype(np.float32)).to_parquet(f"{XD}/oof5_train{TAG}.parquet")
+    del F, P
     kt, Ft = stage1_data("test")
-    pt = (models["A"].predict(Ft, num_threads=32) + models["B"].predict(Ft, num_threads=32)) / 2
+    pt = np.mean([m.predict(Ft, num_threads=32) for m in models], axis=0)
     kt.assign(p=pt.astype(np.float32)).to_parquet(f"{XD}/p5_test{TAG}.parquet")
     print("stage 1 done", flush=True)
 

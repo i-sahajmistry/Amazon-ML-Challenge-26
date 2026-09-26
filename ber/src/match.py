@@ -11,15 +11,21 @@ from collections import Counter
 from common import load, s1_fold, norm_name, core_name, norm_addr, skeleton, f05, WORK, ROOT
 
 KF = int(os.environ.get("KF", 5))  # candidates per S2/S3 record that go to the matcher
+# Adaptive shortlist of the retrieved top-20 (empty = fixed top-KF); what it keeps is candidate_pairs.tsv:
+#   SHORTLIST="softmax:T:c"  per record, the fewest top candidates whose softmax(score / T) sums to >= c  (Sarvesh)
+#   SHORTLIST="gap:d"        per record, every candidate scoring within d of the record's best             (Sarvesh)
+#   SHORTLIST="model:tau"    candidates whose calibrated probability (shortlist.py, retrieval features only) >= tau
+SHORTLIST = os.environ.get("SHORTLIST", "")
+SHORT_F = ["score", "rank", "gap_top1", "gap_next", "top1", "n02", "n05", "n10", "soft"]
 OUT = os.environ.get("OUT", f"{ROOT}/output")
 _NUM = re.compile(r"\d+")
 _ZIP = re.compile(r"\b\d{5,6}\b")
 
 
 def _norm_chunk(df):
-    nn = norm_name(df.business_name)
-    na = norm_addr(df.business_address)
-    cn = core_name(nn)
+    nn = norm_name(df.business_name, df.country)
+    na = norm_addr(df.business_address, df.country)
+    cn = core_name(nn, df.country)
     return pd.DataFrame({
         "nn": nn, "cn": cn, "sk": skeleton(cn), "na": na,
         "num": na.map(lambda x: " ".join(_NUM.findall(x))),
@@ -69,8 +75,9 @@ def _wj_chunk(i):
     lo, hi = _G["job2"][i]
     out = np.zeros((hi - lo, 8), np.float32)
     for j, (ia, ib) in enumerate(zip(_G["sa"][lo:hi], _G["rb"][lo:hi])):
-        for f, (A, B, idf, dflt) in enumerate([(_G["a_cn"][ia], _G["b_cn"][ib], _G["idf_cn"], _G["d_cn"]),
-                                               (_G["a_na"][ia], _G["b_na"][ib], _G["idf_na"], _G["d_na"])]):
+        (icn, dcn), (ina, dna) = _G["idf"][_G["pk"][ia]]            # idf of the pair's country (or the whole split)
+        for f, (A, B, idf, dflt) in enumerate([(_G["a_cn"][ia], _G["b_cn"][ib], icn, dcn),
+                                               (_G["a_na"][ia], _G["b_na"][ib], ina, dna)]):
             A, B = set(A.split()), set(B.split())
             w = lambda S: sum(idf.get(t, dflt) for t in S)
             inter, un = w(A & B), w(A | B)
@@ -92,18 +99,47 @@ def features(split):
     return keys, F, s1, other
 
 
-def _features(split):
-    s1, n1 = load(split, 1), normed(split, 1)
-    other = pd.concat([load(split, 2), load(split, 3)], ignore_index=True)
-    n2 = pd.concat([normed(split, 2), normed(split, 3)], ignore_index=True)
-    c = pd.read_parquet(f"{WORK}/cand_{split}.parquet")
-    # context from the full top-K list before truncating
+def retrieval_feats(c):
+    """per retrieved candidate (rows of a record contiguous, in rank order): gaps to the best / next score, how many
+    candidates are nearly tied with the best, and the candidate's softmax share of the record's scores."""
+    r, sc = c.rid.to_numpy(), c.score.to_numpy(np.float64)
     g = c.groupby("rid").score
     c["top1"] = g.transform("max")
     c["gap_top1"] = c.top1 - c.score
     c["next"] = g.shift(-1).fillna(-1)
     c["gap_next"] = c.score - c["next"]
-    c = c[c["rank"] < KF]
+    top1 = c.top1.to_numpy(np.float64)
+    for d in (0.02, 0.05, 0.1):
+        c[f"n{int(d * 100):02d}"] = pd.Series(sc >= top1 - d).groupby(r).transform("sum").to_numpy(np.int16)
+    e = np.exp((sc - top1) / 0.05)
+    c["soft"] = e / pd.Series(e).groupby(r).transform("sum").to_numpy()
+    return c
+
+
+def keep_mask(c):
+    """which retrieved candidates go to the matcher (see SHORTLIST)."""
+    if not SHORTLIST:
+        return (c["rank"] < KF).to_numpy()
+    kind, *args = SHORTLIST.split(":")
+    if kind == "gap":
+        return c.score.to_numpy() >= c.top1.to_numpy() - float(args[0])
+    if kind == "softmax":
+        T, cut = args
+        e = np.exp((c.score.to_numpy(np.float64) - c.top1.to_numpy(np.float64)) / float(T))
+        g = pd.Series(e).groupby(c.rid.to_numpy())
+        before = (g.cumsum() - e) / g.transform("sum")          # probability mass of the better-ranked candidates
+        return (before < float(cut) - 1e-9).to_numpy()          # keep until the running total reaches c
+    assert kind == "model", SHORTLIST
+    m = lgb.Booster(model_file=f"{WORK}/shortlist.txt")
+    return m.predict(c[SHORT_F], num_threads=32) >= float(args[0])
+
+
+def _features(split):
+    s1, n1 = load(split, 1), normed(split, 1)
+    other = pd.concat([load(split, 2), load(split, 3)], ignore_index=True)
+    n2 = pd.concat([normed(split, 2), normed(split, 3)], ignore_index=True)
+    c = retrieval_feats(pd.read_parquet(f"{WORK}/cand_{split}.parquet"))   # context from the full top-20 list
+    c = c[keep_mask(c)]
     if os.environ.get("SMOKE"):
         c = c[c.rid < 20000]
     c = c.reset_index(drop=True)
@@ -140,8 +176,14 @@ def _features(split):
     F["sk_ratio"] = process.cpdist(x, y, scorer=fuzz.ratio, **P)
     F["sk_tset"] = process.cpdist(x, y, scorer=fuzz.token_set_ratio, **P)
     F["num_partial"] = process.cpdist(a.num.tolist(), b.num.tolist(), scorer=fuzz.partial_token_set_ratio, **P)
-    _G["idf_cn"], _G["d_cn"] = _idf("t_cn", pd.concat([n1.cn, n2.cn]).tolist())
-    _G["idf_na"], _G["d_na"] = _idf("t_na", pd.concat([n1.na, n2.na]).tolist())
+    # token rarity: over the whole split, or (IDF_BY_COUNTRY=1) within each country, so a word's weight does not depend
+    # on which other countries share the split
+    k1, k2 = s1.country.values, other.country.values
+    groups = sorted(set(k1) | set(k2)) if os.environ.get("IDF_BY_COUNTRY") else [None]
+    _G["idf"] = [(_idf("t_cn", pd.concat([n1.cn[k1 == g if g else slice(None)], n2.cn[k2 == g if g else slice(None)]]).tolist()),
+                  _idf("t_na", pd.concat([n1.na[k1 == g if g else slice(None)], n2.na[k2 == g if g else slice(None)]]).tolist()))
+                 for g in groups]
+    _G["pk"] = np.searchsorted(groups, k1) if groups != [None] else np.zeros(len(k1), np.int64)   # per S1
     _G.update(a_cn=n1.cn.tolist(), b_cn=n2.cn.tolist(), a_na=n1.na.tolist(), b_na=n2.na.tolist(),
               sa=c.sid.values, rb=c.rid.values)
     step = len(c) // 1024 + 1
