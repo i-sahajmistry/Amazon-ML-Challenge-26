@@ -7,7 +7,8 @@
 # After v8_chain: in-country baseline for the leave-one-country-out run (loco_eval.py without HOLDOUT: F0.5, loss by
 # error kind and record outcomes per country on entity folds 8-9) and the label-free test score bands per country
 # (test_bands.py), plus retrieval of the held-out country with vs without it in the bi-encoder's training
-# (retrieval_unseen.py). Reads ~/scratch/amlc_v8 and ~/scratch/amlc_loco_india; writes only logs. CPU only (scai_q requires a GPU).
+# (retrieval_unseen.py), the France probe file output_v8_noFR and the validator on both v8 files.
+# Reads ~/scratch/amlc_v8 and ~/scratch/amlc_loco_india; writes logs and output_v8_noFR. CPU only (scai_q requires a GPU).
 # Submit:  qsub ~/scratch/ber_v8_loco/ber/experiments/v8_eval.pbs
 PY=${PY:-$HOME/scratch/miniconda3/envs/amlc312/bin/python}
 set -ex
@@ -16,4 +17,11 @@ cd "${CODE:-$HOME/scratch/ber_v8_loco}/ber/src"
 NORMAL=$HOME/scratch/amlc_v8/work LOCO=$HOME/scratch/amlc_loco_india/work HOLDOUT_NAME=India \
     "$PY" -u retrieval_unseen.py || true   # diagnostic only; never block the rest
 TAG=_v8w "$PY" -u test_bands.py
+# the France probe file (v8 with every France S1 left empty) and the official validator on both v8 files
+BLANK_COUNTRY=France "$PY" -u x_final.py "$AMLC_ROOT/output_v8_noFR" _v8w 0.70
+for o in output_v8 output_v8_noFR; do
+    (cd "$HOME/scratch/amlc_data/student_resource" && "$PY" utils/validate_submission.py \
+        --matching "$AMLC_ROOT/$o/matching_results.tsv" --candidate "$AMLC_ROOT/$o/candidate_pairs.tsv" \
+        --test-dir dataset/test) || true
+done
 TAG=_v8 CE_TAGS=,_raw WORDS=1 "$PY" -u loco_eval.py
