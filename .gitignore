@@ -1,0 +1,14 @@
+# data: see "Data" in README.md
+student_resource/
+*.zip
+
+# generated
+work/
+output/
+submission/
+submissions/
+__pycache__/
+
+# EDA caches and results
+eda/cache/
+eda/deep/out/
