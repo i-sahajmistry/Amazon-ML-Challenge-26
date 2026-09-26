@@ -5,7 +5,7 @@ Rows = one per record (its argmax S1 from stage 1). Trained on out-of-fold stage
 distractors resampled to the test share (~39%), so context counts look like test.
   python stage2.py cv    -> fit on entity folds 4-7, validate on 8-9, then refit on 4-9
   python stage2.py test  -> write output/matching_results.tsv + candidate_pairs.tsv"""
-import os, sys, json, numpy as np, pandas as pd, lightgbm as lgb
+import os, re, sys, json, numpy as np, pandas as pd, lightgbm as lgb
 from common import WORK, ROOT, load
 from harness import truth_arrays, score
 from match import to_sets, write_tsv
@@ -27,6 +27,50 @@ def best_rows(k):
     n20 = k.assign(t=k.p >= 0.2).groupby("rid", sort=True).t.sum().values
     b = k[first].reset_index(drop=True)
     return b.assign(p2=p2.astype(np.float32), rec_n20=n20.astype(np.float32))
+
+
+def record_inputs(k, pv, sel_i):
+    """stage-2 record inputs under stage-1 probabilities pv (row order of k) for the rows sel_i of k:
+    p of that row, p2 = best OTHER candidate of the record, rec_n20 = the record's candidates with pv >= 0.2."""
+    rid = k.rid.values
+    order = np.lexsort((-pv, rid))
+    r_s, p_s = rid[order], pv[order]
+    first = np.r_[True, r_s[1:] != r_s[:-1]]
+    g = np.cumsum(first) - 1
+    top1 = p_s[first]
+    has2 = np.r_[~first[1:], False] & first
+    top2 = np.zeros(len(top1), np.float32)
+    top2[g[has2]] = p_s[np.flatnonzero(has2) + 1]
+    arg1 = order[first]
+    n20 = np.bincount(g, weights=(p_s >= 0.2), minlength=len(top1))
+    gi = pd.Series(np.arange(len(top1)), index=r_s[first]).loc[rid[sel_i]].values
+    p2 = np.where(arg1[gi] == sel_i, top2[gi], top1[gi])
+    return pv[sel_i].astype(np.float32), p2.astype(np.float32), n20[gi].astype(np.float32)
+
+
+def model_cols(k):
+    """per-stage-1-model test probability columns saved by x_stage_multi.py s1 (pm0, pm1, ...)."""
+    return sorted((c for c in k.columns if re.fullmatch(r"pm\d+", c)), key=lambda c: int(c[2:]))
+
+
+def score_per_model(k, b, predict):
+    """Stage 2 is trained on single-model out-of-fold stage-1 probabilities, but test pairs carry the mean of the
+    stage-1 models. Score the test rows b (each record's argmax under the mean) once per stage-1 model, with p, p2,
+    rec_n20 and the entity context recomputed from that model's probabilities, and average. predict(d) -> q."""
+    d = context(b)
+    cols = model_cols(k)
+    if not cols:
+        d["q"] = predict(d)
+        return d
+    idx = pd.MultiIndex.from_arrays([d.rid.values, d.sid.values])
+    qs = []
+    for col in cols:
+        bv = b.copy()
+        bv["p"], bv["p2"], bv["rec_n20"] = record_inputs(k, k[col].values, bv.i.values)
+        dv = context(bv)
+        qs.append(pd.Series(predict(dv), index=pd.MultiIndex.from_arrays([dv.rid.values, dv.sid.values])).loc[idx].values)
+    d["q"] = np.mean(qs, axis=0)
+    return d
 
 
 def context(d):

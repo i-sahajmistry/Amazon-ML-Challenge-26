@@ -1,5 +1,8 @@
 import os, re, json, zlib
+import multiprocessing
 import numpy as np, pandas as pd
+
+multiprocessing.set_start_method("fork", force=True)   # python >= 3.14 defaults to forkserver; pools share globals
 from anyascii import anyascii
 
 # default: the folder that contains src/ (put or symlink student_resource/ there), override with AMLC_ROOT

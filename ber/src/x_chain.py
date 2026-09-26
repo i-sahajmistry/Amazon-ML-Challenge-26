@@ -66,6 +66,29 @@ PLANS["v9"] = [("v9_verr", ["x_verr.py", "_v8"], {}),
                ("v9_s2_k3", ["x_nocopy.py", "test"], {**_V9, "TAG": "_v9k3", "BAG": "5"}),
                ("v9_s1_k6", ["x_stage_multi.py", "s1"], {**_V9, "TAG": "_v9k6", "S1K": "6"}),
                ("v9_s2_k6", ["x_nocopy.py", "test"], {**_V9, "TAG": "_v9k6", "BAG": "5"})]
+# v9m = v9fS end to end: Sahaj's v9 (HNSW retrieval, learned lexicon, name-edit features, text-aware shortlist at
+# 0.001, three stage-1 models) merged with the v8-generalize branch (distractor-word model words.py, stage 2 scored
+# once per stage-1 model, self-training of stage 1 for test countries without labels, LightGBM / XGBoost judge).
+_SL9 = {"SHORTLIST": os.environ.get("SHORTLIST", "text:0.001")}   # Sahaj v9: reproduces its 12,760,925 test pairs exactly
+_S9 = {"TAG": "_v9m", "CE_TAGS": ",_raw", "WORDS": "1", "S1K": "3", "SELFTRAIN": "1"}   # = v9fS
+_OUT9 = os.path.dirname(WORK)
+PLANS["v9m"] = PLANS["v8a"] + [
+    ("v9m_features", ["-c", "from match import features; features('train'); features('test')"], _SL9),
+    ("v9m_extra", ["-c", "import x_feats; x_feats.main('train'); x_feats.main('test')"], {}),
+    ("v9m_stage1v4", ["stage1_cv.py"], {}),
+    ("v9m_words", ["words.py"], {}),
+    ("v9m_ce_train", ["x_ce.py", "train"], {"CE_N": "12000000"}),
+    ("v9m_ce_score_train", ["x_ce.py", "score", "train"], {}),
+    ("v9m_ce_score_test", ["x_ce.py", "score", "test"], {}),
+    ("v9m_raw_train", ["x_ce3.py", "train"], {"CE_TEXT": "raw", "CE_DIR": f"{WORK}/x/ce_raw", "CE_N": "12000000"}),
+    ("v9m_raw_score_train", ["x_ce3.py", "score", "train"], {"CE_TEXT": "raw", "CE_DIR": f"{WORK}/x/ce_raw", "CE_TAG": "_raw"}),
+    ("v9m_raw_score_test", ["x_ce3.py", "score", "test"], {"CE_TEXT": "raw", "CE_DIR": f"{WORK}/x/ce_raw", "CE_TAG": "_raw"}),
+    ("v9m_s1", ["x_stage_multi.py", "s1"], _S9),
+    ("v9m_s2", ["x_nocopy.py", "test"], _S9),
+    ("v9m_final", ["x_final.py", f"{_OUT9}/output_v9mS", "_v9mw", "0.70"], _S9),
+    ("v9m_judge", ["x_judge.py"], _S9),
+    ("v9m_judge_test", ["x_judge.py", "test"], {**_S9, "JUDGE": "best"}),
+    ("v9m_final_judge", ["x_final.py", f"{_OUT9}/output_v9mSJ", "_v9mJ", "auto"], _S9)]
 ARGS = sys.argv[1:]
 PLAN = ARGS.pop(0) if ARGS and ARGS[0] in PLANS else "v5"   # python x_chain.py [plan] [first_step]
 STEPS = PLANS[PLAN]

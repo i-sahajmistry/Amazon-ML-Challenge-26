@@ -10,7 +10,7 @@ folds 8-9: the view Sarvesh's 0.98784 (gap 0.1 + DISTRACTORS=weight) is measured
 import os, sys, json, numpy as np, pandas as pd, lightgbm as lgb
 from common import load
 from harness import truth_arrays, score, wscore
-from stage2 import context
+from stage2 import context, score_per_model
 import x_stage_multi as X
 
 
@@ -69,8 +69,8 @@ if TEST:
             for i, m in enumerate(bag)]
     full[0].save_model(f"{X.XD}/gbm5s2{X.TAG}w.txt")
     k = pd.read_parquet(f"{X.XD}/p5_test{X.TAG}.parquet")
-    d = context(X.rows("test", k))
-    d["q"] = np.mean([m.predict(X.design(d), num_threads=32) for m in full], axis=0)
+    # once per stage-1 model (it was trained on single-model probabilities), the bagged models averaged each time
+    d = score_per_model(k, X.rows("test", k), lambda z: np.mean([m.predict(X.design(z), num_threads=32) for m in full], axis=0))
     d["c"] = load("test", 1).country.values[d.sid.values]
     d[["rid", "sid", "q", "c"]].to_parquet(f"{X.XD}/test_q{X.TAG}w.parquet")
     if not os.path.exists(f"{X.XD}/p5_test{X.TAG}w.parquet"):   # x_final.py reads candidates by the same tag

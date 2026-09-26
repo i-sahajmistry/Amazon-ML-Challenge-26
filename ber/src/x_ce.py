@@ -99,8 +99,6 @@ def auc(y, sc):
 def train():
     s1, other, ts, s1f, rf = truth_arrays()
     A, B = store("train", "s1"), store("train", "other")
-    k = pd.read_parquet(f"{WORK}/feats2_train.parquet", columns=["rid", "sid"])
-    r, s = k.rid.values, k.sid.values
     # training pairs: the retrieved top-5 of S1 folds 0-3, not the matcher's shortlist, so the CE keeps seeing
     # wrong-S1 candidates as negatives whatever the shortlist keeps
     c = pd.read_parquet(f"{WORK}/cand_train.parquet", columns=["rid", "sid", "rank"])
@@ -131,7 +129,13 @@ def train():
         if step % 500 == 0:
             print(f"step {step}/{steps}  loss {run:.4f}  {(step + 1) * BS / (time.time() - t0):.0f} pairs/s", flush=True)
     model.save_pretrained(CE); TOK.save_pretrained(CE)
-    # quick check on fold 9 (never seen by the CE or the embedder): pair AUC and argmax accuracy vs stage-1 OOF
+    # quick check on fold 9 (never seen by the CE or the embedder): pair AUC and argmax accuracy vs stage-1 OOF.
+    # Optional: it needs the matcher pairs and the v4 stage 1 (stage1_cv.py), so the CE can train before them.
+    if not all(os.path.exists(f"{WORK}/{f}") for f in ("feats2_train.parquet", "oof_train.parquet")):
+        print("fold-9 check skipped (feats2_train / oof_train not built yet)", flush=True)
+        return
+    k = pd.read_parquet(f"{WORK}/feats2_train.parquet", columns=["rid", "sid"])
+    r, s = k.rid.values, k.sid.values
     p1 = pd.read_parquet(f"{WORK}/oof_train.parquet", columns=["p"]).p.values
     recs = np.unique(r[rf[r] == 9])
     v = np.flatnonzero(np.isin(r, rng.choice(recs, min(len(recs), 600_000), replace=False)))  # whole candidate lists

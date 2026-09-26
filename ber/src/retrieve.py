@@ -41,7 +41,7 @@ for c in sorted(set(other.country)):
     k = min(K, len(di))
     if ANN in ("hnsw", "ivf"):
         import faiss
-        faiss.omp_set_num_threads(32)
+        faiss.omp_set_num_threads(int(os.environ.get("NT", 32)))
         X = np.ascontiguousarray(E1[di], dtype=np.float32)
         if ANN == "hnsw":
             index = faiss.IndexHNSWFlat(X.shape[1], 32, faiss.METRIC_INNER_PRODUCT)

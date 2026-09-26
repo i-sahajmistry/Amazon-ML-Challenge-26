@@ -2,14 +2,43 @@
 
 Match every Source 2 / Source 3 record to the Source 1 (reference) entity it belongs to, scored by macro F0.5.
 
-**Leaderboard best: v7w, 0.982641** (2026-09-25). A France probe puts US + India at about 0.991 and France at about
-0.933 (see [Leaderboard](#leaderboard)).
-**Current pipeline: v8** (2026-09-26): the same validation score as v7w (0.99236 vs 0.99240, copy-free) with scalable
-blocking (FAISS HNSW search + a calibrated shortlist: 65% fewer candidate pairs than top-5), no hand-written
-abbreviation / legal-form / country tables (a lexicon learned per country from the records), and one decision rule for
-every country. Its leaderboard score is pending.
+**Leaderboard best: v9, 0.985** (2026-09-26; Sahaj's run, not yet in git). v7w scored 0.982641.
 
-## Algorithm (v8)
+**This branch (`v9fS`): v9fS**, Sahaj's v9 merged with the `v8-generalize` branch. It takes v9's HNSW retrieval,
+learned lexicon, name-edit features, text-aware shortlist and three stage-1 models, and adds:
+- the distractor-word model (`words.py`);
+- stage 2 scored once per stage-1 model;
+- **self-training of stage 1 for test countries that have no training labels** (France here);
+- an optional LightGBM/XGBoost judge (`x_judge.py`).
+
+Validation is 0.99257 (copy-free; v9: 0.99254). Self-training only changes France, which validation cannot see.
+Leaderboard score pending. What was done and why: [description.md](description.md). The v8 algorithm below still
+describes the base pipeline; the "v9fS" section lists what differs.
+
+## v9fS: what differs from v8
+
+1. **Shortlist `SHORTLIST=text:0.001`** (`match.py` `text_feats`, `shortlist.py`). The calibrated shortlist model
+   also sees three cheap text similarities of every retrieved pair (normalised name, core name, address) and each
+   one's gap to the record's best pair. On train folds 7-9 at tau 0.005 it keeps 99.36% of true S1s with 1.17
+   candidates per record, against 99.28% at 1.34 for retrieval features alone. On test: 12.76M pairs, 7.4 per S1
+   (US 6.6, India 7.1, France 10.1). This setting reproduces v9's test pairs exactly.
+2. **Stage 1 with `S1K=3`**: three cross-fitted models (S1 folds 4-5, 6-7, 8-9), as in v9. It also takes the
+   **distractor-word features** from `words.py`. That module scores every word a record adds to its S1's name from
+   label-free per-country statistics plus a multilingual-embedding k-NN, leave-one-country-out.
+3. **Stage 2 scored per stage-1 model** (`stage2.score_per_model`). Stage 2 is trained on single-model out-of-fold
+   probabilities, so at test it runs once with each stage-1 model's probabilities (`pm0`, `pm1`, ...) and the
+   results are averaged.
+4. **Self-training** (`SELFTRAIN=1`, `x_stage_multi.self_train`):
+   - Which records: those of test countries with no labelled training records, found from the data.
+   - Pseudo-labels from the stage-1 mean: a record whose best pair has p >= 0.97 matches that pair, and one whose
+     best is <= 0.03 matches nothing.
+   - Two models, each also trained on one half of those records, re-score the other half.
+   - Simulated with one train country hidden (`analysis/v9/g7_selftrain_loco.py`): +0.00055 F0.5 when the hidden
+     country is dissimilar (US hidden), no change when it is close (India hidden).
+5. **Decision judge** (`x_judge.py`, optional): LightGBM, XGBoost (Apache-2.0) or their average, fitted on the same
+   stage-2 rows. On v9fS they are within noise (0.99258 / 0.99254 / 0.99259).
+
+## Algorithm (v8, the base of v9fS)
 
 Key observation from the training ground truth: **every S2/S3 record belongs to at most one S1 entity**
 (7.6M matched ids, none reused), ~26% of S2/S3 records match nothing, and only 5.6% of S1 entities are singletons.
@@ -112,7 +141,11 @@ Validation: entity folds 8–9, distractors at the test share of 39%, macro F0.5
 | v7 | + raw-text cross-encoder | 0.99304 copies | – |
 | v5w | v5, stage 2 without distractor copies | 0.99186 copy-free | – |
 | **v7w** | v7, stage 2 without copies, threshold 0.70 everywhere + France word rule | **0.99240 copy-free** | **0.982641** |
-| **v8** | HNSW + calibrated shortlist, learned lexicon, name-edit features, no e5-base CE, no country rules | **0.99236 copy-free** | pending |
+| **v8** | HNSW + calibrated shortlist, learned lexicon, name-edit features, no e5-base CE, no country rules | **0.99236 copy-free** | – |
+| v9 | v8 + text-aware shortlist (0.001) + three stage-1 models (Sahaj) | 0.99254 copy-free | **0.985** |
+| v9p | v9 + "peers" stage-2 features (Sahaj; code not yet in git) | 0.99279 copy-free | – |
+| **v9fS** | v9 + distractor-word features + per-model stage 2 + self-training for countries without labels | **0.99257 copy-free** (France change not measurable) | pending |
+| v9fJ | v9fS without self-training, LightGBM + XGBoost judge at 0.66 | 0.99259 copy-free | – |
 
 Tried without gain: word-edit log-likelihood features (`x_llr.py`, 0.99274 vs 0.99273), re-ranking each record's top
 2 (`x_top2.py`, 0.99278 either way), an expected-F0.5 decision per S1 instead of a threshold (v3: 0.9775 vs 0.9788).
@@ -130,7 +163,8 @@ blocking misses are records with an empty address whose name is shared by severa
 | v7w | 0.982641 |
 | v7w with every France S1 left empty (probe) | 0.851155 |
 | v4, Sarvesh's run | 0.967214 |
-| Rank 1 (2026-09-25 ~22:45) | 0.988319 |
+| v9 (Sahaj) | 0.985 |
+| Rank 1 (2026-09-26) | 0.990 |
 
 An empty prediction scores 1 on an S1 with no true matches and 0 otherwise. France is s = 259,452 / 1,732,544 =
 14.975% of test S1s, and about e = 5.5% of them should have no match (train prior and our predictions). So:
@@ -163,6 +197,27 @@ cross-encoders start from the fine-tuned copy. (`intfloat/multilingual-e5-base` 
 
 Data: place (or symlink) the provided `student_resource/` folder next to `src/`, or set `AMLC_ROOT` to the folder that
 contains it. Caches, models and logs go to `$AMLC_ROOT/work`.
+
+### Run v9fS (from `src/`)
+End to end: `python x_chain.py v9m`. It runs:
+- the v8a steps (HNSW retrieval, lexicon, both shortlist models);
+- features with `SHORTLIST=text:0.001`, x_feats, words.py;
+- both cross-encoders;
+- stage 1 with `S1K=3 SELFTRAIN=1 WORDS=1`;
+- stage 2, then `../output_v9mS`.
+
+About 7 h on 16 CPUs + 1 A100; the HNSW search is the slow part on CPU.
+
+From an existing v9 work folder (features and cross-encoder scores already built; about 1 h):
+```bash
+export S1K=3 CE_TAGS=,_raw WORDS=1
+python words.py
+TAG=_v9fS SELFTRAIN=1 python x_stage_multi.py s1
+TAG=_v9fS python x_nocopy.py test
+TAG=_v9fS python x_final.py ../output_v9fS _v9fSw 0.70
+```
+Optional judge: `TAG=... python x_judge.py && JUDGE=best TAG=... python x_judge.py test`, then
+`python x_final.py OUT _TAGJ auto`.
 
 ### Run v8 (from `src/`; one A100 80GB, ~32 cores, ~200 GB RAM; about 8 h end to end)
 ```bash

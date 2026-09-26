@@ -23,7 +23,12 @@ EXF = [] if NOCE or os.environ.get("NOEXTRA") else [c for c in XF.COLS   # x_fea
 # stage-1 cross-fitting over the S1 folds 4-9: S1K=2 (two models, as v5-v8), 3 or 6 (each model sees more data,
 # test averages more models)
 S1K = int(os.environ.get("S1K", 2))
+# SELFTRAIN=1: test countries with no labelled training records (found from the data) get pseudo-labels from the
+# stage-1 mean and are re-scored by models that also learn from them (see self_train)
+SELFTRAIN, PL_HI, PL_LO = bool(os.environ.get("SELFTRAIN")), 0.97, 0.03
 GROUPS = {2: [[4, 5, 6], [7, 8, 9]], 3: [[4, 5], [6, 7], [8, 9]], 6: [[f] for f in range(4, 10)]}[S1K]
+WORDF = ["w_add_max", "w_add_sum", "w_add_n8", "w_addrate_max", "w_drop_max", "w_n_add", "w_n_drop"] \
+    if os.environ.get("WORDS") else []   # words.py: distractor-word model, leave-one-country-out
 LLRF = [f"{f}_{e}_{t}" for f in ("n", "a") for e in ("add", "drop") for t in ("sum", "min", "max", "cnt")]     if os.environ.get("LLR") else []   # x_llr.py word-edit log-likelihood ratios
 
 
@@ -60,6 +65,8 @@ def stage1_data(split):
         parts.append(pd.read_parquet(f"{XD}/extra_{split}.parquet", columns=EXF))
     if LLRF:
         parts.append(pd.read_parquet(f"{XD}/llr_{split}.parquet", columns=LLRF))
+    if WORDF:
+        parts.append(pd.read_parquet(f"{XD}/words_{split}.parquet", columns=WORDF))
     F = pd.concat(parts, axis=1)
     return keys, F
 
@@ -86,11 +93,58 @@ def s1():
     for i, g in enumerate(grp):
         oof[g] = P[g, i]
     keys.assign(p=oof.astype(np.float32)).to_parquet(f"{XD}/oof5_train{TAG}.parquet")
-    del F, P
+    del P
     kt, Ft = stage1_data("test")
-    pt = np.mean([m.predict(Ft, num_threads=32) for m in models], axis=0)
-    kt.assign(p=pt.astype(np.float32)).to_parquet(f"{XD}/p5_test{TAG}.parquet")
+    Pt = np.column_stack([m.predict(Ft, num_threads=32) for m in models]).astype(np.float32)
+    if SELFTRAIN:
+        Pt = self_train(F, y, np.any(grp, axis=0), ts, kt, Ft, Pt, params,
+                        int(np.mean([m.best_iteration for m in models]) * 1.15))
+    del F
+    # p = mean of the stage-1 models; pm0, pm1, ... kept so stage 2 can be scored once per model (stage2.score_per_model)
+    kt.assign(p=Pt.mean(axis=1), **{f"pm{i}": Pt[:, i] for i in range(Pt.shape[1])}).to_parquet(f"{XD}/p5_test{TAG}.parquet")
     print("stage 1 done", flush=True)
+
+
+def self_train(F, y, tr, ts, kt, Ft, Pt, params, n_iter):
+    """Self-training for test countries that have no labelled training records (an open set, found from the data).
+    Pseudo-labels from the stage-1 mean: a record whose best pair has p >= PL_HI matches that pair (its other pairs
+    do not); a record whose best pair has p <= PL_LO matches nothing. Two models, each fitted on every labelled
+    training pair (tr) plus the pseudo-labels of one half of those records, re-score the other half, so no record is
+    scored by a model that saw its own pseudo-label. Returns Pt with those records' columns replaced.
+    Simulated on train with one country hidden (analysis g7_selftrain_loco.py): pseudo-labels 99.0-99.9% correct;
+    F0.5 +0.00055 when the hidden country differs more (US hidden), +-0 when it is close (India hidden)."""
+    other_tr = pd.concat([load("train", 2), load("train", 3)], ignore_index=True)
+    labelled = set(other_tr.country.values[ts >= 0])
+    ct = pd.concat([load("test", 2), load("test", 3)], ignore_index=True).country.values
+    rid = kt.rid.values
+    unl = ~np.isin(ct[rid], list(labelled))
+    if not unl.any():
+        print("self-training: every test country has training labels", flush=True)
+        return Pt
+    p = Pt.mean(axis=1)
+    ui = np.flatnonzero(unl)
+    o = ui[np.lexsort((-p[ui], rid[ui]))]
+    best = o[np.r_[True, rid[o][1:] != rid[o][:-1]]]
+    pos_rec, neg_rec = rid[best][p[best] >= PL_HI], rid[best][p[best] <= PL_LO]
+    is_best = np.zeros(len(rid), bool); is_best[best] = True
+    plab = np.full(len(rid), -1, np.int8)
+    in_pos = unl & np.isin(rid, pos_rec)
+    plab[in_pos] = is_best[in_pos]
+    plab[unl & np.isin(rid, neg_rec)] = 0
+    print(f"self-training on {sorted(set(ct[rid[ui]]))}: {len(best)} records, pseudo-labelled {len(pos_rec)} match / "
+          f"{len(neg_rec)} none; {n_iter} rounds", flush=True)
+    half = (rid % 2).astype(bool)
+    out = Pt.copy()
+    for h in (False, True):
+        pl = (plab >= 0) & (half != h)
+        m = lgb.train(params, lgb.Dataset(pd.concat([F[tr], Ft[pl]], ignore_index=True),
+                                          np.r_[y[tr], plab[pl] == 1]), n_iter)
+        part = unl & (half == h)
+        out[part] = m.predict(Ft[part], num_threads=32).astype(np.float32)[:, None]
+    moved = np.abs(out[unl].mean(axis=1) - p[unl])
+    print(f"self-training: mean |change| of p {moved.mean():.4f}; best pairs >= 0.5 before "
+          f"{(p[best] >= 0.5).mean():.4f} after {(out[best].mean(axis=1) >= 0.5).mean():.4f}", flush=True)
+    return out
 
 
 def rows(split, k):
@@ -105,6 +159,8 @@ def rows(split, k):
         parts.append(pd.read_parquet(f"{XD}/extra_{split}.parquet", columns=EXF).iloc[b.i.values].reset_index(drop=True))
     if LLRF:
         parts.append(pd.read_parquet(f"{XD}/llr_{split}.parquet", columns=LLRF).iloc[b.i.values].reset_index(drop=True))
+    if WORDF:
+        parts.append(pd.read_parquet(f"{XD}/words_{split}.parquet", columns=WORDF).iloc[b.i.values].reset_index(drop=True))
     return pd.concat(parts, axis=1)
 
 
@@ -126,7 +182,7 @@ def train_rows():
 
 
 def design(d):
-    X = d[["p", "p2"] + [c for c in d.columns if c.startswith("e_")] + ["rec_n20"] + S1F + CEF + EXF + LLRF].astype(np.float32)
+    X = d[["p", "p2"] + [c for c in d.columns if c.startswith("e_")] + ["rec_n20"] + S1F + CEF + EXF + LLRF + WORDF].astype(np.float32)
     return X.assign(margin=X.p - X.p2)
 
 

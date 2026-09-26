@@ -1,17 +1,18 @@
 """Assemble a submission from a model's test-time stage-2 probabilities (x/test_q{TAG}.parquet, written by
 x_nocopy.py test or x_thr.py): each record goes to its best S1 when q >= THR. One rule for every country.
-  python x_final.py OUT_DIR [TAG] [THR]     # TAG "v5" = untagged (run.sh drops empty args)
+  python x_final.py OUT_DIR [TAG] [THR|auto] # TAG "v5" = untagged (run.sh drops empty args)
   BLANK=<country> python x_final.py ...    # leaderboard probe: that country's S1s left empty, so the score
                                             # difference to the full file isolates that country
   python x_final.py sweep [TAG]             # per country: S1s with no match / matches per S1, by threshold"""
-import os, sys, numpy as np, pandas as pd
+import os, sys, json, numpy as np, pandas as pd
 from common import WORK, load
 from match import to_sets, write_tsv
 
 OUT = sys.argv[1]
 TAG = sys.argv[2] if len(sys.argv) > 2 else "v5"
 TAG = "" if TAG == "v5" else TAG
-THR = float(sys.argv[3]) if len(sys.argv) > 3 else 0.70
+THR = sys.argv[3] if len(sys.argv) > 3 else "0.70"   # "auto": the threshold x_judge.py validated (x/judge{TAG}.json)
+THR = json.load(open(f"{WORK}/x/judge{TAG}.json"))["thr"] if THR == "auto" else float(THR)
 
 d = pd.read_parquet(f"{WORK}/x/test_q{TAG}.parquet")
 s1 = load("test", 1); other = pd.concat([load("test", 2), load("test", 3)], ignore_index=True)
