@@ -50,12 +50,18 @@ for name, d, wt in ((("copies", dup, None),) if not TEST else ()) + (("weighted"
                              4000, valid_sets=[lgb.Dataset(Xv, yv, weight=wv)],
                              callbacks=[lgb.early_stopping(50), lgb.log_evaluation(500)])
 q = {k: m.predict(Xv, num_threads=X.NT) for k, m in models.items()}
+if X.LLMF:   # how much the weighted stage 2 relies on the LLM judge
+    gain = pd.Series(models["weighted"].feature_importance("gain"), index=Xv.columns).sort_values(ascending=False)
+    print("stage-2 feature gain (top 12):\n" + (gain / gain.sum()).round(4).head(12).to_string(), flush=True)
+    print("LLM features' share of gain:", round(float(gain[X.LLMF].sum() / gain.sum()), 4),
+          " rows with a judge score:", round(float(np.isfinite(Xv["llm"].values).mean()), 4), flush=True)
 if TEST:
     for thr in np.arange(0.5, 0.91, 0.05):
         print(f"{thr:.2f}  weighted-trained, copy-free {wscore(sid_v, q['weighted'] >= thr, yv, wv, T, ents):.5f}", flush=True)
     full = lgb.train(X.P2, lgb.Dataset(X.design(nc), nc.y.values, weight=nc.wt.values),
                      int(models["weighted"].best_iteration * 1.15))
-    full.save_model(f"{X.XD}/gbm5s2{X.TAG}w.txt")
+    OT = X.TAG + os.environ.get("S2TAG", "")   # S2TAG: a stage-2 variant (e.g. "L" = with LLM features) keeps its own files
+    full.save_model(f"{X.XD}/gbm5s2{OT}w.txt")
     k = pd.read_parquet(f"{X.XD}/p5_test{X.TAG}.parquet")
     b = X.rows("test", k)                                  # each record's argmax S1 under the mean of A and B
     d = context(b)
@@ -74,10 +80,10 @@ if TEST:
     else:
         d["q"] = full.predict(X.design(d), num_threads=X.NT)
     d["c"] = load("test", 1).country.values[d.sid.values]
-    d[["rid", "sid", "q", "c"]].to_parquet(f"{X.XD}/test_q{X.TAG}w.parquet")
-    if not os.path.exists(f"{X.XD}/p5_test{X.TAG}w.parquet"):   # x_final.py reads candidates by the same tag
-        os.symlink(f"p5_test{X.TAG}.parquet", f"{X.XD}/p5_test{X.TAG}w.parquet")
-    print("wrote", f"{X.XD}/test_q{X.TAG}w.parquet", flush=True)
+    d[["rid", "sid", "q", "c"]].to_parquet(f"{X.XD}/test_q{OT}w.parquet")
+    if not os.path.exists(f"{X.XD}/p5_test{OT}w.parquet"):   # x_final.py reads candidates by the same tag
+        os.symlink(f"p5_test{X.TAG}.parquet", f"{X.XD}/p5_test{OT}w.parquet")
+    print("wrote", f"{X.XD}/test_q{OT}w.parquet", flush=True)
     sys.exit()
 vd = dup.fold.values >= 8
 q_dup = models["copies"].predict(X.design(dup[vd]), num_threads=X.NT)

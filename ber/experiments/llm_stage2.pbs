@@ -1,0 +1,23 @@
+#!/bin/bash
+#PBS -N llm_s2
+#PBS -P scai
+#PBS -q scai_q
+#PBS -l select=1:ncpus=12:ngpus=1:mem=400gb
+#PBS -l walltime=03:00:00
+# Stage 2 with the LLM judge's features (LLM=1) on a finished v8 run with x/llm_{train,test}.parquet: fit on entity folds
+# 4-7 (copy-free validation curve on 8-9 printed in the log: compare with v8_stage2_test.log, the same curve without the
+# LLM), refit on 4-9, score test once per stage-1 model, write the submission and validate it.
+# Submit:  qsub ~/scratch/ber_llm/ber/experiments/llm_stage2.pbs
+#          qsub -v THR=0.75,THR_UNSEEN=0.80 ...    (thresholds chosen on validation / the held-out-country run)
+PY=${PY:-$HOME/scratch/miniconda3/envs/amlc312/bin/python}
+set -ex
+R=${RUNDIR:-$HOME/scratch/amlc_v8}
+export AMLC_ROOT=$R SHORTLIST=learned:0.001 TAG=_v8 CE_TAGS=,_raw WORDS=1 NT=12
+[ -n "${THR_UNSEEN:-}" ] && export THR_UNSEEN
+cd "${CODE:-$HOME/scratch/ber_llm}/ber/src"
+LLM=1 S2TAG=L "$PY" -u x_nocopy.py test 2>&1 | tee "$R/work/logs/llm_stage2_test.log"
+OUT=$R/output_v8L${THR_UNSEEN:+_u$THR_UNSEEN}
+"$PY" -u x_final.py "$OUT" _v8Lw "${THR:-0.70}"
+cd "$HOME/scratch/amlc_data/student_resource"
+"$PY" utils/validate_submission.py --matching "$OUT/matching_results.tsv" --candidate "$OUT/candidate_pairs.tsv" \
+    --test-dir dataset/test

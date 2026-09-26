@@ -24,6 +24,9 @@ EXF = [] if NOCE or os.environ.get("NOEXTRA") else [  # x_feats.py
 WORDF = ["w_add_max", "w_add_sum", "w_add_n8", "w_addrate_max", "w_drop_max", "w_n_add", "w_n_drop"] \
     if os.environ.get("WORDS") else []   # words.py: country-agnostic distractor-word features
 LLRF = [f"{f}_{e}_{t}" for f in ("n", "a") for e in ("add", "drop") for t in ("sum", "min", "max", "cnt")]     if os.environ.get("LLR") else []   # x_llr.py word-edit log-likelihood ratios
+# llm_judge.py: an offline LLM's log-odds that the record and its best S1 are the same business, the best score among
+# the record's other judged candidates, and the gap; NaN where the record was not judged (confident records)
+LLMF = ["llm", "llm_alt", "llm_gap"] if os.environ.get("LLM") else []
 
 
 def _other_max(g, x):
@@ -112,7 +115,21 @@ def rows(split, k):
         parts.append(pd.read_parquet(f"{XD}/llr_{split}.parquet", columns=LLRF).iloc[b.i.values].reset_index(drop=True))
     if WORDF:
         parts.append(pd.read_parquet(f"{XD}/words_{split}.parquet", columns=WORDF).iloc[b.i.values].reset_index(drop=True))
+    if LLMF:
+        parts.append(llm_feats(split, b))
     return pd.concat(parts, axis=1)
+
+
+def llm_feats(split, b):
+    """LLMF for each record's row in b (its best S1): the judge's score of that pair, the best judged alternative."""
+    L = pd.read_parquet(f"{XD}/llm_{split}.parquet", columns=["rid", "sid", "llm"])
+    own = pd.MultiIndex.from_arrays([b.rid.values, b.sid.values])
+    s = pd.Series(L.llm.values, index=pd.MultiIndex.from_arrays([L.rid.values, L.sid.values]))
+    llm = s.reindex(own).values
+    best_sid = pd.Series(b.sid.values, index=b.rid.values)
+    alt = L[L.sid.values != best_sid.reindex(L.rid.values).values].groupby("rid").llm.max()
+    llm_alt = alt.reindex(b.rid.values).values
+    return pd.DataFrame({"llm": llm, "llm_alt": llm_alt, "llm_gap": llm - llm_alt}, dtype=np.float32)
 
 
 def train_rows():
@@ -134,7 +151,8 @@ def train_rows():
 
 
 def design(d):
-    X = d[["p", "p2"] + [c for c in d.columns if c.startswith("e_")] + ["rec_n20"] + S1F + CEF + EXF + LLRF + WORDF].astype(np.float32)
+    X = d[["p", "p2"] + [c for c in d.columns if c.startswith("e_")] + ["rec_n20"] + S1F + CEF + EXF + LLRF + WORDF
+          + LLMF].astype(np.float32)
     return X.assign(margin=X.p - X.p2)
 
 
