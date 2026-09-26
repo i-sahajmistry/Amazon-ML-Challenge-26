@@ -9,7 +9,7 @@ from x_anatomy import positions, XD
 from common import load
 from match import normed
 
-R1 = "/home/scai/mtech/aib262144/scratch/AmazonMLChallenge-structure/scratch/rule1_added.parquet"
+R1 = f"{XD}/rule1_added.parquet"          # x_rule1.py: rule_fr.py accepts, v10_fr3_llm rejects
 
 
 def census(d):
@@ -45,10 +45,10 @@ if __name__ == "__main__":
         x["rows_per_S1"] = x.rows / g.nD.first().value_counts().reindex(x.index).values
         print(f"\n== {c} test: S1s by nD {np.bincount(g.nD.first().values, minlength=5).tolist()}\n  edited SAME records by nD:\n"
               + x.round(4).to_string(), flush=True)
-    r = pd.read_parquet(R1)[["rid", "sid", "cat", "qb"]]
+    r = pd.read_parquet(R1)[["rid", "sid", "qb"]]
     fr = t[t.c.values == "France"]
     nD = fr.groupby("sid").nD.first()
     r["nD"] = nD.reindex(r.sid.values).values
-    print("\n== rule1 additions (LB: ~58% true overall) by nD and category:\n"
-          + r.groupby(["nD", "cat"]).size().unstack(fill_value=0).to_string(), flush=True)
+    print("\n== rule1 additions (LB: ~58% true overall) by nD and stage q band:\n"
+          + r.groupby(["nD", "qb"], observed=True).size().unstack(fill_value=0).to_string(), flush=True)
     r.to_parquet(f"{XD}/rule1_census.parquet")

@@ -211,12 +211,14 @@ placed at the S1's address leaves the S1's shifted decoy cluster short. For ever
 and 90.8% (India) true, and decoy-like words 22.5% (India). No labels are used on France.
 ```
 python x_chain.py llm2 llm2_seed      # x/test_q_v10fr3l: v10_fr3_llm's combined France q (then stop the chain)
+python wstat.py test; python rule_fr.py _v10plw; python x_rule1.py   # rule1 candidates -> x/rule1_added
 python x_wordsame.py; python x_families.py; python x_frfix.py; python x_wordlists.py   # -> x/restore_fr_dd, x/reject_fr_dd
 FROM=France:_v9spw:min,France:_v9s2pw:min,France:_v10s3pw:min RESTORE=restore_fr_dd REJECT=reject_fr_dd \
   python x_final.py ../output_v10_fr3_llm_dd _v10plw 0.70
 ```
-The restore candidates are rule1's additions (`x_census.R1`: strict same number / street / first + rarest name word),
-built by `rule_fr.py` and `scratch/rule1ex.py` on branch `structure` (not yet in this branch).
+The restore candidates are rule1's additions (`x_rule1.py` -> `x_census.R1`): records that `rule_fr.py` accepts (same
+house number incl. bis/ter, same compound sub-number, the S1's distinctive street words, same first + rarest core-name
+word, no word with a `wstat.py` decoy statistic below 0.1) and that v10_fr3_llm rejects.
 
 ## Leaderboard
 

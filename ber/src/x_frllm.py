@@ -36,7 +36,7 @@ for n, s in sets.items():
           flush=True)
 
 # rule1 (LB: ~57.5% true) by the hand-review families (x_families.py), and SUF7 by added word
-R1 = "/home/scai/mtech/aib262144/scratch/AmazonMLChallenge-structure/scratch/rule1_added.parquet"
+from x_census import R1
 fam = pd.read_parquet(f"{XD}/fam_France.parquet")[["rid", "sid", "fam", "add"]]
 r1 = pd.read_parquet(R1)[["rid", "sid"]].merge(fam, on=["rid", "sid"], how="left").merge(t, on=["rid", "sid"], how="left")
 k = np.isfinite(r1.llm.values)
