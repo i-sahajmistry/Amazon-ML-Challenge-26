@@ -23,9 +23,13 @@ EXF = [] if NOCE or os.environ.get("NOEXTRA") else [c for c in XF.COLS   # x_fea
 # stage-1 cross-fitting over the S1 folds 4-9: S1K=2 (two models, as v5-v8), 3 or 6 (each model sees more data,
 # test averages more models)
 PEERS = bool(os.environ.get("PEERS"))   # stage 2 also sees the records claiming the same S1 at the same house number
-QTAG = TAG + ("p" if PEERS else "")     # stage-2 artefacts of a PEERS run get their own name
+QTAG = TAG + ("p" if PEERS else "") + os.environ.get("S2TAG", "")   # stage-2 artefacts of a PEERS / S2TAG
+                                                                 # (e.g. "L" = with LLM features) run get their own name
 S1K = int(os.environ.get("S1K", 2))
 GROUPS = {2: [[4, 5, 6], [7, 8, 9]], 3: [[4, 5], [6, 7], [8, 9]], 6: [[f] for f in range(4, 10)]}[S1K]
+# llm_judge.py: an offline LLM's log-odds that the record and its best S1 are the same business, the best score among
+# the record's other judged candidates, and the gap; NaN where the record was not judged (confident records)
+LLMF = ["llm", "llm_alt", "llm_gap"] if os.environ.get("LLM") else []
 LLRF = [f"{f}_{e}_{t}" for f in ("n", "a") for e in ("add", "drop") for t in ("sum", "min", "max", "cnt")]     if os.environ.get("LLR") else []   # x_llr.py word-edit log-likelihood ratios
 
 
@@ -130,7 +134,21 @@ def rows(split, k):
         parts.append(pd.read_parquet(f"{XD}/extra_{split}.parquet", columns=EXF).iloc[b.i.values].reset_index(drop=True))
     if LLRF:
         parts.append(pd.read_parquet(f"{XD}/llr_{split}.parquet", columns=LLRF).iloc[b.i.values].reset_index(drop=True))
+    if LLMF:
+        parts.append(llm_feats(split, b))
     return pd.concat(parts, axis=1)
+
+
+def llm_feats(split, b):
+    """LLMF for each record's row in b (its best S1): the judge's score of that pair, the best judged alternative."""
+    L = pd.read_parquet(f"{XD}/llm_{split}.parquet", columns=["rid", "sid", "llm"])
+    own = pd.MultiIndex.from_arrays([b.rid.values, b.sid.values])
+    s = pd.Series(L.llm.values, index=pd.MultiIndex.from_arrays([L.rid.values, L.sid.values]))
+    llm = s.reindex(own).values
+    best_sid = pd.Series(b.sid.values, index=b.rid.values)
+    alt = L[L.sid.values != best_sid.reindex(L.rid.values).values].groupby("rid").llm.max()
+    llm_alt = alt.reindex(b.rid.values).values
+    return pd.DataFrame({"llm": llm, "llm_alt": llm_alt, "llm_gap": llm - llm_alt}, dtype=np.float32)
 
 
 def train_rows():
@@ -151,7 +169,7 @@ def train_rows():
 
 
 def design(d):
-    X = d[["p", "p2"] + [c for c in d.columns if c.startswith("e_")] + ["rec_n20"] + S1F + CEF + EXF + LLRF].astype(np.float32)
+    X = d[["p", "p2"] + [c for c in d.columns if c.startswith("e_")] + ["rec_n20"] + S1F + CEF + EXF + LLRF + LLMF].astype(np.float32)
     return X.assign(margin=X.p - X.p2)
 
 

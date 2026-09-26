@@ -29,6 +29,8 @@ SELF_C = os.environ.get("SELF_C", "")        # become labels, for these countrie
 SELF_N = int(os.environ.get("SELF_N", 0))    # cap on pseudo-labelled pairs, 0 = all
 HI, LO = float(os.environ.get("SELF_HI", 0.98)), float(os.environ.get("SELF_LO", 0.02))
 TEXT = os.environ.get("CE_TEXT", "norm")    # norm: cached v4 normalisation | raw: transliterated, lowercased, punctuation kept
+                                            # | orig: the text as given (case, accents, scripts), for a multilingual
+                                            # pretrained reranker (CE_BASE=bge-reranker-v2-m3, Apache-2.0)
 TOK = AutoTokenizer.from_pretrained(BASE)
 CLS, SEP, PAD = TOK.cls_token_id, TOK.sep_token_id, TOK.pad_token_id
 
@@ -45,6 +47,10 @@ def store(split, tag):
         if TEXT == "norm":   # cached v4 normalisation (transliterated, lowercased, abbreviations expanded)
             n = normed(split, 1) if tag == "s1" else pd.concat([normed(split, 2), normed(split, 3)], ignore_index=True)
             t = (n.nn + " | " + n.na).tolist()
+        elif TEXT == "orig":  # as given: a multilingual pretrained model reads accents and scripts itself
+            from common import load
+            df = load(split, 1) if tag == "s1" else pd.concat([load(split, 2), load(split, 3)], ignore_index=True)
+            t = (df.business_name.astype(str) + " | " + df.business_address.astype(str)).tolist()
         else:                # raw: keeps punctuation / suffix spelling ("L.L.C." vs "LLC") that normalisation drops
             from common import load
             df = load(split, 1) if tag == "s1" else pd.concat([load(split, 2), load(split, 3)], ignore_index=True)

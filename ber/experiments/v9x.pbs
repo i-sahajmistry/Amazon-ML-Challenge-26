@@ -1,0 +1,169 @@
+#!/bin/bash
+#PBS -N v9x
+#PBS -P scai
+#PBS -q scai_q
+#PBS -l select=1:ncpus=16:ngpus=2:mem=300gb
+#PBS -l walltime=10:00:00
+# v9p_frand + a multilingual reranker (bge-reranker-v2-m3, Apache-2.0, 568M) + the LLM judge (Qwen2.5-7B-Instruct,
+# Apache-2.0, 7.62B), end to end to the submission files, in one job. Reads the finished v9p_frand work folder
+# ($V9, never written) through links in its own run folder ($R), so every new file lands in $R/work.
+#   GPU 0: bge fine-tuned on the retrieved top-5 pairs of S1 folds 0-3 (as the other cross-encoders, original text),
+#          scores every test pair and every train pair of folds 4-9, then helps the LLM
+#   GPU 1: LLM gate, then the LLM judges France's unsure test records and 200k unsure train records (8 shards per
+#          split, claimed by whichever GPU is free)
+#   CPU:   stage 1 with bge (v9 stack and the France self-trained stack), stage 2 (5 seeds, house-number peers) per variant, x_final, validator. Submissions in $R/output_v9x_*:
+#          0 = v9p_frand rebuilt from its files (must equal the leaderboard file), a = + LLM (France), b = + bge,
+#          c = + bge + LLM (France). US / India always come from a stack without the LLM; France: the LLM stack,
+#          vetoed by the self-trained stack (v9p_frand's rule).
+# Resumable: every step leaves $R/work/logs/<step>.ok; a resubmission skips finished steps and finished LLM shards.
+# PHASE=gpu stops after the GPU work (bge, LLM), for a first job with few CPUs; the same script without PHASE then
+# does stage 1 / 2 and the files (and any GPU step left over, on its one GPU).
+# Needs the bge model in $BGE (hf download BAAI/bge-reranker-v2-m3 --local-dir $BGE, by the user with the proxy);
+# GPU 0 waits for it up to 2 h, and without it only files 0 and a are made.
+# Submit:  J=$(qsub -l select=1:ncpus=4:ngpus=2:mem=200gb -v PHASE=gpu ~/scratch/ber_v9x/ber/experiments/v9x.pbs)
+#          qsub -W depend=afterany:$J -l select=1:ncpus=16:ngpus=1:mem=300gb ~/scratch/ber_v9x/ber/experiments/v9x.pbs
+PY=${PY:-$HOME/scratch/miniconda3/envs/amlc312/bin/python}
+V9=${V9:-/scratch/scai/mtech/aib262045/work}
+R=${RUNDIR:-/scratch/scai/mtech/aib262045/amlc_v9x}
+CODE=${CODE:-$HOME/scratch/ber_v9x}
+BGE=${BGE:-/scratch/scai/mtech/aib262045/models/bge-reranker-v2-m3}
+export LLM_MODEL=${LLM_MODEL:-/scratch/scai/mtech/aib262045/models/Qwen2.5-7B-Instruct}
+NC=${NCPUS:-16}; NS=8
+W=$R/work; X=$W/x; L=$W/logs
+mkdir -p "$X" "$L"
+export AMLC_ROOT=$R HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 SHORTLIST=text:0.001 OMP_NUM_THREADS=$NC
+cd "$CODE/ber/src"
+echo "v9x $PBS_JOBID on $(hostname) $(date +%T); GPUs ${CUDA_VISIBLE_DEVICES:-unset}"
+nvidia-smi --query-gpu=name,memory.total --format=csv || true
+if [ -n "${CUDA_VISIBLE_DEVICES:-}" ]; then G=(${CUDA_VISIBLE_DEVICES//,/ }); else G=(0 1); fi
+G0=${G[0]}; G1=${G[1]:-${G[0]}}
+
+# ---------------------------------------------------------------- inputs: links to the v9p_frand files (read only)
+ln -sfn "$HOME/scratch/amlc_data/student_resource" "$R/student_resource"
+for f in "$V9"/*; do n=$(basename "$f"); case $n in x|logs) ;; *) [ -e "$W/$n" ] || [ -L "$W/$n" ] || ln -s "$f" "$W/$n";; esac; done
+for f in "$V9"/x/*; do n=$(basename "$f"); case $n in tok*|llm*|*bge*) ;; *) [ -e "$X/$n" ] || [ -L "$X/$n" ] || ln -s "$f" "$X/$n";; esac; done
+for f in feats2_train.parquet feats2_test.parquet oof_train.parquet cand_train.parquet lexicon.json \
+         x/oof5_train_v9.parquet x/p5_test_v9.parquet x/oof5_train_v9s.parquet x/p5_test_v9s.parquet \
+         x/ce_train.npy x/ce_test.npy x/ce_raw_train.npy x/ce_raw_test.npy x/ce_ns_train.npy x/ce_ns_test.npy \
+         x/ce_rs_train.npy x/ce_rs_test.npy x/extra_train.parquet x/extra_test.parquet \
+         x/test_q_v9pw.parquet x/test_q_v9spw.parquet x/p5_test_v9pw.parquet; do
+    [ -e "$W/$f" ] || { echo "missing v9 input $W/$f"; exit 1; }
+done
+rm -rf "$X"/llm_lock_*   # claims of a previous, interrupted run
+
+run() {   # run <step> <env assignments...> -- <script> <args...>: skipped when <step>.ok exists
+    local n=$1; shift
+    if [ -e "$L/$n.ok" ]; then echo "skip $n (done)"; return 0; fi
+    local envs=(); while [ "$1" != "--" ]; do envs+=("$1"); shift; done; shift
+    echo "start $n $(date +%T)"
+    env "${envs[@]}" "$PY" -u "$@" > "$L/$n.log" 2>&1 || { echo "FAILED $n $(date +%T), see $L/$n.log"; tail -15 "$L/$n.log"; return 1; }
+    touch "$L/$n.ok"; echo "done $n $(date +%T)"
+}
+
+llm_shards() {   # llm_shards <gpu>: judge every unclaimed LLM shard, test first (the submission needs it)
+    local g=$1 sp k
+    for sp in test train; do for k in $(seq 0 $((NS - 1))); do
+        [ -e "$X/llm_$sp.part$k.parquet" ] && continue
+        mkdir "$X/llm_lock_${sp}_$k" 2>/dev/null || continue
+        echo "start llm $sp shard $k on GPU $g $(date +%T)"
+        env CUDA_VISIBLE_DEVICES=$g SHARD=$k NSHARD=$NS "$PY" -u llm_judge.py score $sp > "$L/llm_score_${sp}_$k.log" 2>&1 \
+            || { echo "FAILED llm $sp shard $k, see $L/llm_score_${sp}_$k.log"; tail -5 "$L/llm_score_${sp}_$k.log"; return 1; }
+        echo "done llm $sp shard $k $(date +%T)"
+    done; done
+}
+
+llm_parts_done() { local sp k; for sp in test train; do for k in $(seq 0 $((NS - 1))); do
+    [ -e "$X/llm_$sp.part$k.parquet" ] || return 1; done; done; }
+
+wait_gate() {   # 0 once the LLM gate passed, 1 if it failed
+    until [ -e "$L/llm_gate.ok" ] || [ -e "$L/llm_gate.failed" ]; do sleep 30; done
+    [ -e "$L/llm_gate.ok" ]
+}
+
+BGEV=(CE_BASE=$BGE CE_DIR=$X/ce_bge CE_TEXT=orig CE_TAG=_bge)
+gpu0() {
+    local i
+    for i in $(seq 1 240); do   # the bge download (up to 2 h; not when bge is already done)
+        [ -e "$L/bge_score_train.ok" ] && break
+        [ -e "$BGE/model.safetensors" ] && [ -e "$BGE/tokenizer.json" ] && \
+            [ "$(ls "$BGE"/.cache/huggingface/download/*.incomplete 2>/dev/null | wc -l)" = 0 ] && break
+        [ $((i % 10)) = 1 ] && echo "waiting for the bge model in $BGE $(date +%T)"
+        sleep 30
+    done
+    if [ -e "$BGE/model.safetensors" ] && \
+       run bge_train "CUDA_VISIBLE_DEVICES=$G0" "${BGEV[@]}" CE_N=3000000 CE_BS=256 CE_LR=2e-5 -- x_ce3.py train && \
+       run bge_score_test "CUDA_VISIBLE_DEVICES=$G0" "${BGEV[@]}" -- x_ce3.py score test && \
+       run bge_score_train "CUDA_VISIBLE_DEVICES=$G0" "${BGEV[@]}" -- x_ce3.py score train; then
+        wait_gate && llm_shards "$G0"
+    else
+        echo "no bge stack (model missing or a bge step failed): GPU 0 helps the LLM"
+        wait_gate && llm_shards "$G0"
+    fi
+    return 0
+}
+gpu1() {
+    run llm_select_train TAG=_v9 SEL=v8 LLM_MAX=200000 -- llm_judge.py select train &&
+    run llm_select_test TAG=_v9 SEL=v8 LLM_COUNTRIES=unseen -- llm_judge.py select test &&
+    run llm_gate "CUDA_VISIBLE_DEVICES=$G1" LLM_SMOKE=2000 -- llm_judge.py score train \
+        || { touch "$L/llm_gate.failed"; echo "no LLM: the gate or the selection failed"; return 0; }
+    llm_shards "$G1"
+    return 0
+}
+rm -f "$L/llm_gate.failed"
+gpu0 > "$L/v9x_gpu0.log" 2>&1 & P0=$!
+gpu1 > "$L/v9x_gpu1.log" 2>&1 & P1=$!
+wait $P0; wait $P1
+cat "$L/v9x_gpu1.log" "$L/v9x_gpu0.log"
+if [ "${PHASE:-all}" = gpu ]; then echo "GPU phase done $(date +%T)"; exit 0; fi
+
+# ---------------------------------------------------------------- stage 2 per variant, submissions, validation
+HAVE_LLM=0; llm_parts_done && run llm_merge_train -- llm_judge.py merge train && run llm_merge_test -- llm_judge.py merge test && HAVE_LLM=1
+HAVE_BGE=0
+if [ -e "$L/bge_score_train.ok" ]; then   # stage 1 with the bge scores: v9 stack and France self-trained stack
+    S1V=(S1K=3 NT=$((NC / 2)))
+    ( run s1_v9g TAG=_v9g CE_TAGS=,_raw,_bge "${S1V[@]}" -- x_stage_multi.py s1 ) &
+    ( run s1_v9gs TAG=_v9gs CE_TAGS=_ns,_rs,_bge "${S1V[@]}" -- x_stage_multi.py s1 ) &
+    wait
+    [ -e "$L/s1_v9g.ok" ] && [ -e "$L/s1_v9gs.ok" ] && HAVE_BGE=1
+fi
+echo "LLM features: $HAVE_LLM   bge stack: $HAVE_BGE"
+S2=(BAG=5 PEERS=1 "P2X={\"num_threads\": $((NC / 2))}")   # two stage-2 runs at a time
+V9C=(TAG=_v9 CE_TAGS=,_raw); V9S=(TAG=_v9s CE_TAGS=_ns,_rs)
+V9G=(TAG=_v9g CE_TAGS=,_raw,_bge); V9GS=(TAG=_v9gs CE_TAGS=_ns,_rs,_bge)
+
+final() {   # final <name> <base q tag> <FROM spec>: submission + validator
+    local n=$1 base=$2 from=$3 out=$R/output_v9x_$1
+    [ -e "$L/final_$n.ok" ] && { echo "skip final_$n (done)"; return 0; }
+    FROM=$from "$PY" -u x_final.py "$out" "$base" 0.70 > "$L/final_$n.log" 2>&1 || { echo "FAILED final_$n"; tail -5 "$L/final_$n.log"; return 1; }
+    (cd "$HOME/scratch/amlc_data/student_resource" && "$PY" utils/validate_submission.py \
+        --matching "$out/matching_results.tsv" --candidate "$out/candidate_pairs.tsv" --test-dir dataset/test) \
+        >> "$L/final_$n.log" 2>&1 || { echo "FAILED validation of $n"; tail -5 "$L/final_$n.log"; return 1; }
+    touch "$L/final_$n.ok"; echo "SUBMISSION $n ready: $out"; tail -3 "$L/final_$n.log"
+}
+
+s2() { local n=$1; shift; run "$n" "$@" -- x_nocopy.py test; }
+final 0 _v9pw "France:_v9spw:min"
+# stage-2 runs two at a time, in the order the files need them: c (bge + LLM) first, then a (LLM), then b (bge)
+B=$HAVE_BGE; M=$HAVE_LLM
+[ $B = 1 ] && ( s2 s2_v9gp "${V9G[@]}" "${S2[@]}" ) &
+[ $B = 1 ] && [ $M = 1 ] && ( s2 s2_v9gpL "${V9G[@]}" "${S2[@]}" LLM=1 S2TAG=L ) &
+wait
+[ $B = 1 ] && [ $M = 1 ] && ( s2 s2_v9gspL "${V9GS[@]}" "${S2[@]}" LLM=1 S2TAG=L ) &
+[ $M = 1 ] && ( s2 s2_v9pL "${V9C[@]}" "${S2[@]}" LLM=1 S2TAG=L ) &
+wait
+[ -e "$L/s2_v9gp.ok" ] && [ -e "$L/s2_v9gpL.ok" ] && [ -e "$L/s2_v9gspL.ok" ] && final c _v9gpw "France:_v9gpLw,France:_v9gspLw:min"
+[ $M = 1 ] && ( s2 s2_v9spL "${V9S[@]}" "${S2[@]}" LLM=1 S2TAG=L ) &
+[ $B = 1 ] && ( s2 s2_v9gsp "${V9GS[@]}" "${S2[@]}" ) &
+wait
+[ -e "$L/s2_v9pL.ok" ] && [ -e "$L/s2_v9spL.ok" ] && final a _v9pw "France:_v9pLw,France:_v9spLw:min"
+[ -e "$L/s2_v9gp.ok" ] && [ -e "$L/s2_v9gsp.ok" ] && final b _v9gpw "France:_v9gspw:min"
+
+echo "==================== summary $(date +%T)"
+grep -h "fold-9 pair AUC\|argmax by" "$L/bge_train.log" 2>/dev/null
+grep -h "judge AUC on" "$L/llm_merge_train.log" 2>/dev/null
+for s in s2_v9gp s2_v9gpL s2_v9gspL s2_v9pL s2_v9spL s2_v9gsp; do
+    [ -e "$L/$s.log" ] && echo "$s  US/India copy-free val: $(grep -h '^0.70  weighted' "$L/$s.log")"
+done
+echo "(v9p: 0.99277, v9s: 0.99245)"
+for n in 0 c a b; do [ -e "$L/final_$n.ok" ] && echo "file $n: $R/output_v9x_$n  $(grep -h '^thr' "$L/final_$n.log")"; done
+echo "v9x done $(date +%T)"

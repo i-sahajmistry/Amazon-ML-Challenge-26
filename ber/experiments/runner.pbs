@@ -1,0 +1,32 @@
+#!/bin/bash
+#PBS -N runner
+#PBS -P scai
+#PBS -q scai_q
+#PBS -l select=1:ncpus=16:ngpus=2:mem=300gb
+#PBS -l walltime=12:00:00
+# Holds this job's CPUs / GPUs and runs the shell scripts dropped into $RQ/queue/, oldest first, one at a time, so a
+# chain of steps never waits in the PBS queue again. Each script moves queue/ -> running/ -> done/ or failed/, its
+# output goes to logs/<name>.log. Scripts inherit this job's CUDA_VISIBLE_DEVICES (index into it for 2 GPUs).
+# Idle GPUs still count against the budget: stop it when the work is done (touch $RQ/STOP, or qdel).
+# Submit:  qsub ~/scratch/ber_unseen/ber/experiments/runner.pbs        (RQ=~/scratch/runq by default)
+# Use:     cp step.sh ~/scratch/runq/queue/$(date +%H%M%S)_step.sh
+RQ=${RQ:-$HOME/scratch/runq}
+mkdir -p "$RQ"/{queue,running,done,failed,logs}
+rm -f "$RQ/STOP"
+export OMP_NUM_THREADS=${NCPUS:-16}   # PBS sets 1 by default
+echo "runner $PBS_JOBID on $(hostname), GPUs ${CUDA_VISIBLE_DEVICES:-unset}, started $(date +%T)" | tee "$RQ/runner.info"
+nvidia-smi --query-gpu=name,memory.total --format=csv | tee -a "$RQ/runner.info"
+while [ ! -e "$RQ/STOP" ]; do
+    s=$(ls "$RQ"/queue/*.sh 2>/dev/null | head -1 || true)
+    if [ -z "$s" ]; then sleep 20; continue; fi
+    n=$(basename "$s" .sh)
+    mv "$s" "$RQ/running/$n.sh"
+    echo "$(date +%T) start $n" >> "$RQ/runner.log"
+    bash "$RQ/running/$n.sh" > "$RQ/logs/$n.log" 2>&1; rc=$?
+    if [ $rc = 0 ]; then
+        mv "$RQ/running/$n.sh" "$RQ/done/"; echo "$(date +%T) done $n" >> "$RQ/runner.log"
+    else
+        mv "$RQ/running/$n.sh" "$RQ/failed/"; echo "$(date +%T) FAILED $n (exit $rc)" >> "$RQ/runner.log"
+    fi
+done
+echo "$(date +%T) runner stopped (STOP file)" >> "$RQ/runner.log"
