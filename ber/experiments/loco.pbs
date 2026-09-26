@@ -1,0 +1,58 @@
+#!/bin/bash
+#PBS -N loco
+#PBS -P scai
+#PBS -q scai_q
+#PBS -l select=1:ncpus=8:ngpus=2:mem=400gb
+#PBS -l walltime=08:00:00
+# Leave-one-country-out v8 (a labelled stand-in for France): with HOLDOUT=<country> no step trains on that train
+# country (common.s1_fold gives it fold 10). Rebuilds everything that learns from labels without it: bi-encoder,
+# retrieval, shortlist, stage 1 (v4 and v8), both cross-encoders; dictionaries and word statistics are label-free.
+# Then loco_eval.py scores the held-out country like test. Train side only (SKIP_TEST=1).
+# Every step leaves work/logs/<step>.ok; a resubmission skips finished steps.
+# Submit:  qsub ~/scratch/ber_v8_loco/ber/experiments/loco.pbs            (HOLDOUT=India)
+#          qsub -v HOLDOUT=US ~/scratch/ber_v8_loco/ber/experiments/loco.pbs
+PY=${PY:-$HOME/scratch/miniconda3/envs/amlc312/bin/python}
+set -ex
+H=${HOLDOUT:-India}
+R=${RUNDIR:-$HOME/scratch/amlc_loco_$(echo "$H" | tr '[:upper:]' '[:lower:]')}
+OLD=$HOME/scratch/AmazonMLChallenge/work
+mkdir -p "$R/work/pq" "$R/work/logs"
+ln -sfn "$HOME/scratch/amlc_data/student_resource" "$R/student_resource"
+ln -sfn "$OLD/cand_test.parquet" "$R/work/cand_test.parquet"   # label-free test pairs, read by mine_dicts / words
+for f in "$OLD"/pq/train_source*.parquet "$OLD"/pq/test_source*.parquet "$OLD"/pq/train_ground_truth.parquet; do
+    ln -sf "$f" "$R/work/pq/$(basename "$f")"
+done
+export AMLC_ROOT=$R HOLDOUT=$H SKIP_TEST=1 SHORTLIST=learned:0.001 NT=8 NCPUS=8 HF_HUB_OFFLINE=1
+export E5=${E5:-/scratch/scai/mtech/aib262045/hf/hub/models--intfloat--multilingual-e5-small/snapshots/614241f622f53c4eeff9890bdc4f31cfecc418b3}
+L=$R/work/logs
+V8="TAG=_v8 CE_TAGS=,_raw WORDS=1"
+nvidia-smi || true
+cd "${CODE:-$HOME/scratch/ber_v8_loco}/ber/src"
+set +x
+
+run() {   # run <step> <env assignments...> -- <script> <args...>
+    local n=$1; shift
+    if [ -e "$L/$n.ok" ]; then echo "skip $n (done)"; return 0; fi
+    local envs=(); while [ "$1" != "--" ]; do envs+=("$1"); shift; done; shift
+    echo "start $n $(date +%T)"
+    env "${envs[@]}" "$PY" -u "$@" > "$L/$n.log" 2>&1 || { echo "FAILED $n, see $L/$n.log"; tail -20 "$L/$n.log"; exit 1; }
+    touch "$L/$n.ok"; echo "done $n $(date +%T)"
+}
+
+run train_embed CUDA_VISIBLE_DEVICES=0 -- train_embed.py
+run retrieve CUDA_VISIBLE_DEVICES=0 -- retrieve.py train
+run mine_dicts -- mine_dicts.py
+run prep_norm -- prep_norm.py
+run shortlist -- shortlist.py
+run stage1_v4 -- stage1_cv.py
+# CPU features, the word model and the two cross-encoders in parallel (GPU 0: words then CE, GPU 1: raw-text CE)
+( run x_feats -- x_feats.py train ) & P1=$!
+( run words CUDA_VISIBLE_DEVICES=0 -- words.py &&
+  run ce_train CUDA_VISIBLE_DEVICES=0 CE_N=12000000 -- x_ce.py train &&
+  run ce_score CUDA_VISIBLE_DEVICES=0 -- x_ce.py score train ) & P2=$!
+( run ce_raw_train CUDA_VISIBLE_DEVICES=1 CE_TEXT=raw CE_DIR=$R/work/x/ce_raw CE_N=12000000 -- x_ce3.py train &&
+  run ce_raw_score CUDA_VISIBLE_DEVICES=1 CE_TEXT=raw CE_DIR=$R/work/x/ce_raw CE_TAG=_raw -- x_ce3.py score train ) & P3=$!
+wait $P1 && wait $P2 && wait $P3 || { echo "a parallel step failed"; exit 1; }
+run stage1 $V8 -- x_stage_multi.py s1
+run loco_eval $V8 -- loco_eval.py
+echo "all done $(date +%T)"; cat "$L/loco_eval.log" | tail -60

@@ -176,7 +176,7 @@ def main():
     T = pd.concat([token_stats("train"), token_stats("test")], ignore_index=True)
     T = word_scores(T, embed(T.tok.tolist()))
     T.drop(columns=["ins", "end", "start"]).to_parquet(f"{WORK}/dicts/words.parquet")
-    for sp in ("train", "test"):
+    for sp in ("train",) if os.environ.get("SKIP_TEST") else ("train", "test"):   # SKIP_TEST: train only
         pair_features(sp, T)
 
 

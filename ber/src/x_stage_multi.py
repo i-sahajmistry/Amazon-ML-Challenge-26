@@ -5,7 +5,7 @@ their owner's fold, distractors their hash fold).
   python x_stage.py cv     # stage 2: fit entity folds 4-7, test-like validation on 8-9, refit on 4-9
   python x_stage.py test   # write $OUT/matching_results.tsv + candidate_pairs.tsv"""
 import os, sys, json, numpy as np, pandas as pd, lightgbm as lgb
-from common import WORK, ROOT, load
+from common import WORK, ROOT, load, HOLDOUT, HELD
 from harness import truth_arrays, score
 from match import to_sets, write_tsv
 from stage2 import best_rows, context, S1F, PARAMS as P2
@@ -82,8 +82,14 @@ def s1():
     print(pd.Series(models["A"].feature_importance("gain"), index=F.columns).sort_values(ascending=False)
           .round(0).head(20).to_string(), flush=True)
     pA, pB = models["A"].predict(F, num_threads=NT), models["B"].predict(F, num_threads=NT)
-    keys.assign(p=np.where(gB, pA, np.where(gA, pB, (pA + pB) / 2)).astype(np.float32)).to_parquet(f"{XD}/oof5_train{TAG}.parquet")
+    oof = keys.assign(p=np.where(gB, pA, np.where(gA, pB, (pA + pB) / 2)).astype(np.float32))
+    if HOLDOUT:   # the held-out country is scored like test: both models, stage 2 once per model (loco_eval.py)
+        oof = oof.assign(pA=pA.astype(np.float32), pB=pB.astype(np.float32))
+    oof.to_parquet(f"{XD}/oof5_train{TAG}.parquet")
     del F
+    if os.environ.get("SKIP_TEST"):
+        print("stage 1 done (train only)", flush=True)
+        return
     kt, Ft = stage1_data("test")
     pA_t, pB_t = models["A"].predict(Ft, num_threads=NT), models["B"].predict(Ft, num_threads=NT)
     # pA / pB kept so stage 2 can be scored once per stage-1 model (it was trained on single-model probabilities)
@@ -114,10 +120,11 @@ def train_rows():
     b = rows("train", pd.read_parquet(f"{WORK}/oof_train.parquet" if NOCE else f"{XD}/oof5_train{TAG}.parquet"))
     matched = ts >= 0
     r, s = b.rid.values, b.sid.values
-    keep_m = matched[r] & (rf[r] >= 4) & (s1f[s] >= 4)
-    dis = ~matched[r] & (rf[r] >= 4) & (s1f[s] >= 4)          # distractors the CE never saw
+    ok_r, ok_s = (rf[r] >= 4) & (rf[r] < HELD), (s1f[s] >= 4) & (s1f[s] < HELD)   # HELD: held-out country
+    keep_m = matched[r] & ok_r & ok_s
+    dis = ~matched[r] & ok_r & ok_s          # distractors the CE never saw
     rng = np.random.default_rng(0)
-    pool = np.where(~matched & (rf >= 4))[0]
+    pool = np.where(~matched & (rf >= 4) & (rf < HELD))[0]
     w = np.bincount(rng.choice(pool, int(SHARE / (1 - SHARE) * matched.sum()), replace=True), minlength=len(ts))
     bd = b[dis]
     d = pd.concat([b[keep_m], bd.loc[bd.index.repeat(w[bd.rid.values])]], ignore_index=True)
@@ -140,7 +147,7 @@ def cv():
                   callbacks=[lgb.early_stopping(50), lgb.log_evaluation(200)])
     print(pd.Series(m.feature_importance("gain"), index=X.columns).sort_values(ascending=False).round(0).head(15).to_string())
     q = m.predict(X[va], num_threads=NT)
-    sid, tru, ents = d.sid.values[va], y[va], np.where(s1f >= 8)[0]
+    sid, tru, ents = d.sid.values[va], y[va], np.where((s1f >= 8) & (s1f < HELD))[0]
     d.loc[va, ["rid", "sid", "p", "y"]].assign(q=q).to_parquet(f"{XD}/s5_val{TAG}.parquet")
     res = {}
     for thr in [0.5, 0.6]:

@@ -6,7 +6,11 @@ test share, in the loss and in the validation precision. Fit on entity folds 4-7
       refit the judge on folds 4-9 (1.15 x its best iterations), score test once with stage-1 model A's and once
       with model B's probabilities (stage 2 learned on single-model probabilities) and average
       -> x/test_q{TAG}J.parquet + x/judge{TAG}J.json (judge, thr) for x_final.py (THR=auto)"""
-import os, sys, json, numpy as np, pandas as pd, lightgbm as lgb, xgboost as xgb
+import os, sys, json, numpy as np, pandas as pd, lightgbm as lgb
+try:
+    import xgboost as xgb
+except ImportError:   # only the XGBoost judge needs it; x_nocopy.py imports wscore / record_inputs from here
+    xgb = None
 from common import load
 from harness import truth_arrays
 from stage2 import context

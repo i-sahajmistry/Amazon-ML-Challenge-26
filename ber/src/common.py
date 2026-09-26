@@ -23,9 +23,25 @@ def load(split, src):
     return df
 
 
+HOLDOUT = os.environ.get("HOLDOUT", "")   # leave-one-country-out: this train country is never trained on
+HELD = 10                                  # its fold: outside 0-9, so no training or validation step selects it
+_held = None
+
+
 def s1_fold(ids):
-    """Deterministic split of train S1 ids: 0..9 by crc32. Folds 0-3 -> embedder, 4-8 -> GBM, 9 -> validation."""
-    return np.array([zlib.crc32(x.encode()) % 10 for x in ids], dtype=np.int8)
+    """Deterministic split of train S1 ids: 0..9 by crc32. Folds 0-3 -> embedder, 4-8 -> GBM, 9 -> validation.
+    With HOLDOUT=<country>, every train S1 / S2 / S3 id of that country gets fold HELD instead."""
+    f = np.array([zlib.crc32(x.encode()) % 10 for x in ids], dtype=np.int8)
+    if HOLDOUT:
+        global _held
+        if _held is None:
+            _held = set()
+            for src in (1, 2, 3):
+                d = load("train", src)
+                _held.update(d.entity_id.values[d.country.values == HOLDOUT])
+            assert _held, f"no train records of HOLDOUT={HOLDOUT}"
+        f[np.fromiter((x in _held for x in ids), bool, len(ids))] = HELD
+    return f
 
 
 _NAME_ABBR = {

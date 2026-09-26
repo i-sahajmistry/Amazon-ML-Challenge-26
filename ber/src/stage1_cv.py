@@ -1,7 +1,7 @@
 """Stage 1, cross-fitted: two pairwise LightGBM models on complementary S1 folds give out-of-fold (OOF)
 probabilities for every train pair (needed to train stage 2 without leakage); test = mean of both models.
   folds 4-6 -> model A, folds 7-9 -> model B; distractors follow their hash fold; folds 0-3 (embedder) -> mean."""
-import numpy as np, pandas as pd, lightgbm as lgb
+import os, sys, numpy as np, pandas as pd, lightgbm as lgb
 from common import WORK
 from match import features
 from harness import truth_arrays
@@ -26,6 +26,9 @@ pA = models["A"].predict(F, num_threads=32); pB = models["B"].predict(F, num_thr
 p = np.where(gB, pA, np.where(gA, pB, (pA + pB) / 2)).astype(np.float32)
 keys.assign(p=p).to_parquet(f"{WORK}/oof_train.parquet")
 del F
+if os.environ.get("SKIP_TEST"):   # leave-one-country-out runs need train only
+    print("done (train only)", flush=True)
+    sys.exit()
 kt, Ft, _, _ = features("test")
 pt = ((models["A"].predict(Ft, num_threads=32) + models["B"].predict(Ft, num_threads=32)) / 2).astype(np.float32)
 kt.assign(p=pt).to_parquet(f"{WORK}/p1_test.parquet")

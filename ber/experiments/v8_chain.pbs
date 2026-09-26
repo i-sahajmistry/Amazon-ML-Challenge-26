@@ -1,0 +1,27 @@
+#!/bin/bash
+#PBS -N v8_chain
+#PBS -P scai
+#PBS -q scai_q
+#PBS -l select=1:ncpus=12:ngpus=1:mem=400gb
+#PBS -l walltime=24:00:00
+# Reproduce v8 (branch v8-generalize, clean copy in ~/scratch/ber_v8) in its own run folder, reusing the
+# fine-tuned e5 and the train/test top-20 candidates already built on PADUM (train_embed.py and retrieve.py are
+# unchanged since v4). Runs x_chain.py plan v8: mined dictionaries -> normalisation -> learned shortlist -> v4
+# features + stage 1 -> x_feats -> words -> two cross-encoders -> stage 1 -> copy-free stage 2 -> output_v8.
+# Step logs: $RUNDIR/work/logs/<step>.log.  Resume from a step: qsub -v FIRST=<step name> ...
+PY=${PY:-$HOME/scratch/miniconda3/envs/amlc312/bin/python}
+set -ex
+R=${RUNDIR:-$HOME/scratch/amlc_v8}
+OLD=$HOME/scratch/AmazonMLChallenge/work
+mkdir -p "$R/work/pq" "$R/work/logs"
+ln -sfn "$HOME/scratch/amlc_data/student_resource" "$R/student_resource"
+ln -sfn "$OLD/cand_train.parquet" "$R/work/cand_train.parquet"
+ln -sfn "$OLD/cand_test.parquet" "$R/work/cand_test.parquet"
+ln -sfn "$OLD/e5_ft" "$R/work/e5_ft"
+for f in "$OLD"/pq/train_source*.parquet "$OLD"/pq/test_source*.parquet "$OLD"/pq/train_ground_truth.parquet; do
+    ln -sf "$f" "$R/work/pq/$(basename "$f")"   # raw data only; v8 normalises with its own mined dictionaries
+done
+export AMLC_ROOT=$R NCPUS=${NCPUS:-12}
+nvidia-smi || true
+cd "${CODE:-$HOME/scratch/ber_v8}/ber/src"
+"$PY" -u x_chain.py v8 ${FIRST:-}
