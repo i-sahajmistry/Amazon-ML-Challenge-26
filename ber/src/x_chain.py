@@ -152,6 +152,23 @@ PLANS["v10b"] = [("v10b_fit", ["x_ce3.py", "train"], {**_B10, "CE_N": "3000000",
                  ("v10b_test", ["x_ce3.py", "score", "test"], _B10),
                  ("v10b_s1", ["x_stage_multi.py", "s1"], {**_STB, "S1K": "3"}),
                  ("v10b_s2p", ["x_nocopy.py", "test"], {**_STB, "BAG": "5", "PEERS": "1"})]
+# llm2 = the LLM judge on every unsure v10 row (llm_{val,test}_v10p), and a copy continued on France's confident
+# decisions of v10_fr3_llm (x/llm_lora_fr): France's unsure rows re-scored by it (llm_{val,test}_v10p_fr)
+_FR = {"LLM_DIR": f"{WORK}/x/llm_lora_fr", "LLM_TAG": "_fr"}
+PLANS["llm2"] = [("llm2_seed", ["x_final.py", "-", "_v10plw"], {"FROM": "France:_v9spw:min,France:_v9s2pw:min,France:_v10s3pw:min",
+                                                               "SAVE_Q": "_v10fr3l"}),
+                 ("llm2_extend", ["x_llm.py", "extend"], {"QT": "_v9p", "QB": "_v10p"}),
+                 ("llm2_fr_train", ["x_llm.py", "train"], {**_FR, "QT": "_v9p", "LLM_N": "30000", "SELF_N": "50000",
+                                                           "SELF": f"{WORK}/x/test_q_v10fr3l.parquet",
+                                                           "LLM_INIT": f"{WORK}/x/llm_lora", "LLM_LR": "5e-5"}),
+                 ("llm2_fr_val", ["x_llm.py", "val"], {**_FR, "QT": "_v10p"}),
+                 ("llm2_fr_test", ["x_llm.py", "test"], {**_FR, "QT": "_v10p", "COUNTRY": "France"})]
+# v10n = v10 + signed house-number shift features (x_feats int_first_shift / int_near_shift): extra features
+# recomputed, stages rebuilt with the v10 CEs -> x/test_q_v10npw
+_STN = {**_D, "CE_TAGS": "_n10,_r10", "TAG": "_v10n"}
+PLANS["v10n"] = [("v10n_extra", ["-c", "import x_feats; x_feats.main('train'); x_feats.main('test')"], {}),
+                 ("v10n_s1", ["x_stage_multi.py", "s1"], {**_STN, "S1K": "3"}),
+                 ("v10n_s2p", ["x_nocopy.py", "test"], {**_STN, "BAG": "5", "PEERS": "1"})]
 ARGS = sys.argv[1:]
 PLAN = ARGS.pop(0) if ARGS and ARGS[0] in PLANS else "v5"   # python x_chain.py [plan] [first_step]
 STEPS = PLANS[PLAN]

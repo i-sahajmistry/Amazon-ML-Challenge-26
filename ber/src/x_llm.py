@@ -5,7 +5,12 @@ trained on US / India text cannot.
   python x_llm.py train      # LoRA on train records of S1 folds 4-7 whose stage-1 p is unsure (+ some sure ones)
   python x_llm.py val        # score validation rows (x/val_q{QT}w, folds 8-9) in the unsure band; stacking check
   python x_llm.py test       # score test rows (x/test_q{QT}w) in the unsure band -> x/llm_test{QT}.parquet
-env QT (stage-2 tag, default _v9p), LLM (base model dir), LLM_N (training pairs), BAND (lo,hi)"""
+  QB=_v10p python x_llm.py extend   # unsure rows of stage-2 model QB: reuse QT's scores of the same pairs, score the
+                                    # rest -> x/llm_{val,test}{QB}{LLM_TAG}.parquet
+  SELF=x/test_q_v10fr3l.parquet LLM_INIT=x/llm_lora LLM_DIR=x/llm_lora_fr LLM_TAG=_fr python x_llm.py train
+                             # continue the LoRA on confident test decisions of the countries without train labels
+env QT (stage-2 tag, default _v9p), LLM (base model dir), LLM_N (training pairs), BAND (lo,hi), LLM_DIR (adapter),
+LLM_TAG (output suffix), SELF_N (pseudo-labelled pairs), SELF_C (countries; default: those without train labels)"""
 import os, sys, math, time, numpy as np, pandas as pd, torch
 import torch.nn.functional as Fn
 from transformers import AutoTokenizer, AutoModelForCausalLM
@@ -15,7 +20,11 @@ from harness import truth_arrays, wscore
 XD = f"{WORK}/x"
 QT = os.environ.get("QT", "_v9p")
 BASE = os.environ.get("LLM", "/scratch/scai/mtech/aib262144/models/qwen3-reranker-4b")
-OUTD = f"{XD}/llm_lora"
+OUTD = os.environ.get("LLM_DIR", f"{XD}/llm_lora")
+LT = os.environ.get("LLM_TAG", "")
+INIT = os.environ.get("LLM_INIT", "")        # an adapter to continue instead of a fresh LoRA
+SELF = os.environ.get("SELF", "")            # self-training: test q file whose confident decisions become labels
+SELF_N = int(os.environ.get("SELF_N", 80_000))
 N = int(os.environ.get("LLM_N", 120_000))
 LO, HI = map(float, os.environ.get("BAND", "0.01,0.99").split(","))
 BS, LR, MAXLEN = int(os.environ.get("LLM_BS", 32)), float(os.environ.get("LLM_LR", 1e-4)), 160
@@ -43,6 +52,9 @@ def model(lora=True):
     if lora == "load":
         from peft import PeftModel
         m = PeftModel.from_pretrained(m, OUTD).merge_and_unload()
+    elif lora and INIT:
+        from peft import PeftModel
+        m = PeftModel.from_pretrained(m, INIT, is_trainable=True)
     elif lora:
         from peft import LoraConfig, get_peft_model
         m = get_peft_model(m, LoraConfig(r=16, lora_alpha=32, lora_dropout=0.05, task_type="CAUSAL_LM",
@@ -83,6 +95,18 @@ def train():
     T1, T2 = texts("train")
     P = prompts(T1, T2, b.sid.values, b.rid.values)
     print(f"train pairs {len(P)} (unsure band {band.sum()} records), positive {y.mean():.3f}", flush=True)
+    if SELF:   # each record's best pair where the decision is confident: q >= 0.98 -> 1, q <= 0.02 -> 0
+        q = pd.read_parquet(SELF)
+        ctry = os.environ["SELF_C"].split(",") if os.environ.get("SELF_C") else sorted(set(q.c) - set(s1.country))
+        q = q[q.c.isin(ctry) & ((q.q.values >= 0.98) | (q.q.values <= 0.02))]
+        pos, neg = q[q.q.values >= 0.98], q[q.q.values <= 0.02]
+        q = pd.concat([pos.sample(min(len(pos), SELF_N // 2), random_state=0), neg.sample(min(len(neg), SELF_N // 2), random_state=0)])
+        U1, U2 = texts("test")
+        P = P + prompts(U1, U2, q.sid.values, q.rid.values)
+        y = np.r_[y, (q.q.values >= 0.98).astype(np.float32)]
+        o = rng.permutation(len(P)); P = [P[i] for i in o]; y = y[o]
+        print(f"+ pseudo-labelled {ctry}: {len(pos)} confident matches, {len(neg)} confident non-matches; "
+              f"{len(q)} pairs used; total {len(P)}", flush=True)
     m = model(True); m.print_trainable_parameters()
     opt = torch.optim.AdamW([p for p in m.parameters() if p.requires_grad], lr=LR, weight_decay=0.0)
     steps = math.ceil(len(P) / BS); warm = int(0.03 * steps)
@@ -114,7 +138,7 @@ def val():
     m = model("load")
     llm = np.full(len(v), np.nan, np.float32)
     llm[band] = score(m, prompts(T1, T2, v.sid.values[band], v.rid.values[band]))
-    v.assign(llm=llm).to_parquet(f"{XD}/llm_val{QT}.parquet")
+    v.assign(llm=llm).to_parquet(f"{XD}/llm_val{QT}{LT}.parquet")
     y = v.y.values.astype(bool)
     print(f"val rows {len(v)}, unsure band {band.sum()}: AUC stage-2 q {auc(y[band], v.q.values[band]):.4f}, "
           f"LLM {auc(y[band], llm[band]):.4f}", flush=True)
@@ -151,13 +175,40 @@ def stack_check(v, ts, s1f):
 def test():
     d = pd.read_parquet(f"{XD}/test_q{QT}w.parquet")
     band = (d.q.values > LO) & (d.q.values < HI)
+    if os.environ.get("COUNTRY"):                  # e.g. COUNTRY=France: score that country's unsure rows only
+        band &= d.c.isin(os.environ["COUNTRY"].split(",")).values
     T1, T2 = texts("test")
     m = model("load")
     llm = np.full(len(d), np.nan, np.float32)
     llm[band] = score(m, prompts(T1, T2, d.sid.values[band], d.rid.values[band]))
-    d.assign(llm=llm).to_parquet(f"{XD}/llm_test{QT}.parquet")
-    print("wrote", f"{XD}/llm_test{QT}.parquet", pd.Series(d.c.values[band]).value_counts().to_dict(), flush=True)
+    d.assign(llm=llm).to_parquet(f"{XD}/llm_test{QT}{LT}.parquet")
+    print("wrote", f"{XD}/llm_test{QT}{LT}.parquet", pd.Series(d.c.values[band]).value_counts().to_dict(), flush=True)
+
+
+def extend():
+    """unsure rows of stage-2 model QB with an LLM score: reuse QT's score of the same (record, S1) pair, score the
+    rest (COUNTRY= limits the test rows scored)."""
+    QB = os.environ["QB"]
+    m = None
+    for split, base, src in (("val", f"val_q{QB}w", f"llm_val{QT}{LT}"), ("test", f"test_q{QB}w", f"llm_test{QT}{LT}")):
+        d = pd.read_parquet(f"{XD}/{base}.parquet")
+        s = pd.read_parquet(f"{XD}/{src}.parquet")
+        s = s[np.isfinite(s.llm.values)][["rid", "sid", "llm"]]
+        d = d.merge(s, on=["rid", "sid"], how="left")
+        band = (d.q.values > LO) & (d.q.values < HI)
+        if split == "test" and os.environ.get("COUNTRY"):
+            band &= d.c.isin(os.environ["COUNTRY"].split(",")).values
+        need = band & ~np.isfinite(d.llm.values)
+        print(f"{split}: unsure rows {band.sum()}, already scored {(band & np.isfinite(d.llm.values)).sum()}, "
+              f"to score {need.sum()}", flush=True)
+        if need.any():
+            m = m or model("load")
+            T1, T2 = texts("train" if split == "val" else "test")
+            d.loc[need, "llm"] = score(m, prompts(T1, T2, d.sid.values[need], d.rid.values[need]))
+        d.loc[~band, "llm"] = np.nan
+        d.to_parquet(f"{XD}/llm_{split}{QB}{LT}.parquet")
+        print("wrote", f"{XD}/llm_{split}{QB}{LT}.parquet", flush=True)
 
 
 if __name__ == "__main__":
-    {"train": train, "val": val, "test": test}[sys.argv[1]]()
+    {"train": train, "val": val, "test": test, "extend": extend}[sys.argv[1]]()

@@ -2,7 +2,7 @@
 
 Match every Source 2 / Source 3 record to the Source 1 (reference) entity it belongs to, scored by macro F0.5.
 
-**Leaderboard best: v10_fr3_llm, 0.987071** (2026-09-26; v10_fr3 0.986077, v10_fr2 0.985942, v9p_frand 0.984742,
+**Leaderboard best: v10_fr3_llm_dd, 0.990282** (2026-09-27; v10_fr3_llm 0.987071, v10_fr3 0.986077, v10_fr2 0.985942, v9p_frand 0.984742,
 v7w 0.982641). The public and private leaderboards are both subsets of the provided test file, so every country
 scored is one we see: US, India and France.
 **Current pipeline: v10_fr3_llm** = v9p_frand (below) with four changes, see [After v9p_frand](#after-v9p_frand-v10_fr2):
@@ -151,7 +151,8 @@ Validation: entity folds 8–9, distractors at the test share of 39%, macro F0.5
 | v9p + LLM judge | Qwen3-Reranker-4B (LoRA) blended into the unsure records | 0.99297 (cross-fitted) | – |
 | v10s3p | self-training round 3 on v10, seeded by v10_fr2's France decisions | 0.99255 | – |
 | v10_fr3 | v10_fr2 + the round-3 France veto | 0.99285 | 0.986077 |
-| **v10_fr3_llm** | v10_fr3 with the LLM judge blended into v10's unsure records | **0.99282** (v10's own set, 0.99262 without) | **0.987071** |
+| v10_fr3_llm | v10_fr3 with the LLM judge blended into v10's unsure records | 0.99282 (v10's own set, 0.99262 without) | 0.987071 |
+| **v10_fr3_llm_dd** | v10_fr3_llm + France same-address fixes (`x_wordlists.py`): restore 32,439 rejected records whose added words spread like true matches, reject 11,655 accepted type-word swaps | US / India unchanged | **0.990282** |
 
 Validation scores are at threshold 0.70 from v9 on.
 
@@ -202,11 +203,27 @@ in folds 0–3 (the cross-encoders saw them), so a training / validation entity 
   +0.00016 on v9p's validation (0.99277 → 0.99293) with the model trained on the old folds; v10b trains it on v10's
   folds (`CE_TEXT=orig`: text as given, since the model reads case, accents and scripts itself).
 
+### v10_fr3_llm_dd: France same-address fixes (leaderboard 0.990282, +0.003211)
+France's contested records sit at the S1's own house number. Each S1 gets a roughly fixed number of decoys, so a decoy
+placed at the S1's address leaves the S1's shifted decoy cluster short. For every word added at the same address,
+`x_wordlists.py` compares the spread of those records over nD (the S1's records at other numbers) with unedited records
+(total variation distance): TV ≤ 0.10 is true-like, TV ≥ 0.20 decoy-like. On validation, true-like words are 98.7% (US)
+and 90.8% (India) true, and decoy-like words 22.5% (India). No labels are used on France.
+```
+python x_chain.py llm2 llm2_seed      # x/test_q_v10fr3l: v10_fr3_llm's combined France q (then stop the chain)
+python x_wordsame.py; python x_families.py; python x_frfix.py; python x_wordlists.py   # -> x/restore_fr_dd, x/reject_fr_dd
+FROM=France:_v9spw:min,France:_v9s2pw:min,France:_v10s3pw:min RESTORE=restore_fr_dd REJECT=reject_fr_dd \
+  python x_final.py ../output_v10_fr3_llm_dd _v10plw 0.70
+```
+The restore candidates are rule1's additions (`x_census.R1`: strict same number / street / first + rarest name word),
+built by `rule_fr.py` and `scratch/rule1ex.py` on branch `structure` (not yet in this branch).
+
 ## Leaderboard
 
 | File | Score |
 |---|---|
-| **v10_fr3_llm** | **0.987071** |
+| **v10_fr3_llm_dd** | **0.990282** |
+| v10_fr3_llm | 0.987071 |
 | v10_fr3 | 0.986077 |
 | v10_fr2 | 0.985942 |
 | v9p_frand | 0.984742 |

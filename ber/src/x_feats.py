@@ -17,7 +17,9 @@ from match import normed
 
 COLS = ["int_first_eq", "int_a0_in_b", "int_a0_mindiff", "int_jacc", "int_a_only", "int_b_only",
         "legal_added", "legal_dropped", "legal_a", "legal_b", "legal_xor",
-        "ed_add", "ed_del", "ed_swap_sim", "ed_add_susp", "ed_add_df", "ed_del_df"]
+        "ed_add", "ed_del", "ed_swap_sim", "ed_add_susp", "ed_add_df", "ed_del_df",
+        "int_first_shift", "int_near_shift"]   # signed: distractors shift the house number up (+1..13 for 92-99% of
+                                                # them), true-match number noise goes either way
 MIN_INS, PSEUDO_COS, NONE_DF = 20, 0.9, math.log(1e-6)
 _G = {}
 
@@ -40,6 +42,8 @@ def _chunk(i):
             a0, SA, SB = A[0], set(A), set(B)
             out[j, :6] = (a0 == B[0], a0 in SB, math.log1p(min(abs(a0 - b) for b in B)),
                           len(SA & SB) / len(SA | SB), len(SA - SB), len(SB - SA))
+            near = min(B, key=lambda b: abs(b - a0))
+            out[j, 17:19] = (max(-100, min(100, B[0] - a0)), max(-100, min(100, near - a0)))
         else:
             out[j, :6] = (-1, -1, -1, -1, len(A), len(B))
         la, lb = LA[x], LB[y]

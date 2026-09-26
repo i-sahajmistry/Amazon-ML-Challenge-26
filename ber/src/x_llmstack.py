@@ -10,6 +10,8 @@ from harness import truth_arrays
 
 QT = sys.argv[1] if len(sys.argv) > 1 else "_v9p"
 QB = sys.argv[2] if len(sys.argv) > 2 else QT
+LT = os.environ.get("LLM_TAG", "")              # LLM variant (x_llm.py LLM_TAG), e.g. _fr: continued on France
+OUT = os.environ.get("OUT", f"{QB}l{LT}")       # -> x/test_q{OUT}w.parquet
 
 
 def attach(base, src):
@@ -20,14 +22,14 @@ def attach(base, src):
     return d
 
 
-v = attach(pd.read_parquet(f"{XD}/val_q{QB}w.parquet"), pd.read_parquet(f"{XD}/llm_val{QT}.parquet"))
+v = attach(pd.read_parquet(f"{XD}/val_q{QB}w.parquet"), pd.read_parquet(f"{XD}/llm_val{QT}{LT}.parquet"))
 band = (v.q.values > LO) & (v.q.values < HI)
 print(f"validation unsure rows {band.sum()}, with an LLM score {np.isfinite(v.llm.values).sum()}", flush=True)
 s1, other, ts, s1f, rf = truth_arrays()
 stack_check(v, ts, s1f)
 lr = fit_stack(v[np.isfinite(v.llm.values)])
 print("stack coefficients [logit q, llm]", lr.coef_.round(3), "intercept", lr.intercept_.round(3), flush=True)
-d = attach(pd.read_parquet(f"{XD}/test_q{QB}w.parquet"), pd.read_parquet(f"{XD}/llm_test{QT}.parquet"))
+d = attach(pd.read_parquet(f"{XD}/test_q{QB}w.parquet"), pd.read_parquet(f"{XD}/llm_test{QT}{LT}.parquet"))
 m = np.isfinite(d.llm.values)
 q = d.q.values.copy()
 q[m] = apply_stack(lr, d[m])
@@ -36,9 +38,9 @@ for c in sorted(d.c.unique()):
     u = k & (d.q.values > LO) & (d.q.values < HI)
     print(f"{c}: unsure rows {u.sum()}, re-scored {(m & k).sum()}; accepted at 0.70 before {(d.q.values[k] >= 0.7).sum()}, "
           f"after {(q[k] >= 0.7).sum()}", flush=True)
-out = f"{XD}/test_q{QB}lw.parquet"
+out = f"{XD}/test_q{OUT}w.parquet"
 d.assign(q=q)[["rid", "sid", "q", "c"]].to_parquet(out)
-link = f"{XD}/p5_test{QB}lw.parquet"
+link = f"{XD}/p5_test{OUT}w.parquet"
 if not os.path.exists(link):
     os.symlink(os.path.basename(os.path.realpath(f"{XD}/p5_test{QB}w.parquet")), link)
 print("wrote", out, flush=True)

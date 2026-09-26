@@ -53,6 +53,16 @@ if os.environ.get("NUMVETO"):
             & d.c.isin(os.environ["NUMVETO"].split(",")).values)
     print("number veto:", pd.Series(d.c.values[veto & (d.q.values >= THR)]).value_counts().to_dict(), "accepted records", flush=True)
     d.loc[veto, "q"] = 0.0
+for f in filter(None, os.environ.get("RESTORE", "").split(",")):   # x/restore_*.parquet (rid, sid): accept these pairs
+    r = pd.read_parquet(f"{WORK}/x/{f}.parquet")
+    k = pd.Series(r.sid.values, index=r.rid.values).reindex(d.rid.values).values == d.sid.values
+    d.loc[k, "q"] = 1.0
+    print(f"restore {f}: {k.sum()} records", flush=True)
+for f in filter(None, os.environ.get("REJECT", "").split(",")):    # x/reject_*.parquet (rid, sid): reject these pairs
+    r = pd.read_parquet(f"{WORK}/x/{f}.parquet")
+    k = pd.Series(r.sid.values, index=r.rid.values).reindex(d.rid.values).values == d.sid.values
+    print(f"reject {f}: {k.sum()} records, {(k & (d.q.values >= THR)).sum()} of them accepted before", flush=True)
+    d.loc[k, "q"] = 0.0
 thr = np.full(len(d), THR)
 for spec in filter(None, os.environ.get("THR_C", "").split(",")):  # "France:0.8": that country's threshold
     c, t = spec.split(":")
