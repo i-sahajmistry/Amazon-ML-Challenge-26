@@ -2,11 +2,14 @@
 
 Match every Source 2 / Source 3 record to the Source 1 (reference) entity it belongs to, scored by macro F0.5.
 
-**Leaderboard best: v10_fr2, 0.985942** (2026-09-26; v9p_frand 0.984742, v7w 0.982641). The public and private
-leaderboards are both subsets of the provided test file, so every country scored is one we see: US, India and France.
-**Current pipeline: v10_fr2** = v9p_frand (below) with two changes, see [After v9p_frand](#after-v9p_frand-v10_fr2):
+**Leaderboard best: v10_fr3_llm, 0.987071** (2026-09-26; v10_fr3 0.986077, v10_fr2 0.985942, v9p_frand 0.984742,
+v7w 0.982641). The public and private leaderboards are both subsets of the provided test file, so every country
+scored is one we see: US, India and France.
+**Current pipeline: v10_fr3_llm** = v9p_frand (below) with four changes, see [After v9p_frand](#after-v9p_frand-v10_fr2):
 distractors are assigned to the fold of the S1 they imitate, so every training entity keeps all its distractors
-(validation 0.99285 vs 0.99277 on the same records), and a second self-training round adds a second France veto.
+(validation 0.99285 vs 0.99277 on the same records); self-training rounds 2 and 3 add two more France vetoes; and a
+LoRA-tuned LLM judge (Qwen3-Reranker-4B) is blended into the unsure records (+0.000994 on the leaderboard, five times
+its validation gain, so mostly France).
 
 **v9p_frand**: the v8 design (scalable HNSW blocking + calibrated shortlist, a lexicon learned per
 country, no hand-written tables) with a shortlist that also sees text similarities (7.4 candidate pairs per S1 on test,
@@ -144,8 +147,11 @@ Validation: entity folds 8–9, distractors at the test share of 39%, macro F0.5
 | v9p_frand | v9p; a France record needs the self-trained stack (v9s + peers) to agree | 0.99277 (US / India = v9p) | 0.984742 |
 | v9s2p | self-training round 2, seeded by v9p_frand's France decisions | 0.99274 copy-free | – |
 | v10 | v9p with distractors in the fold of the S1 they imitate, both CEs retrained | 0.99285 on v9p's rows (0.99262 on its own, harder set) | – |
-| **v10_fr2** | v10; a France record needs both self-trained stacks (v9sp, v9s2p) to agree | **0.99285** | **0.985942** |
-| v9p + LLM judge | Qwen3-Reranker-4B (LoRA) blended into the unsure records | 0.99297 (cross-fitted) | pending |
+| v10_fr2 | v10; a France record needs both self-trained stacks (v9sp, v9s2p) to agree | 0.99285 | 0.985942 |
+| v9p + LLM judge | Qwen3-Reranker-4B (LoRA) blended into the unsure records | 0.99297 (cross-fitted) | – |
+| v10s3p | self-training round 3 on v10, seeded by v10_fr2's France decisions | 0.99255 | – |
+| v10_fr3 | v10_fr2 + the round-3 France veto | 0.99285 | 0.986077 |
+| **v10_fr3_llm** | v10_fr3 with the LLM judge blended into v10's unsure records | **0.99282** (v10's own set, 0.99262 without) | **0.987071** |
 
 Validation scores are at threshold 0.70 from v9 on.
 
@@ -190,13 +196,19 @@ in folds 0–3 (the cross-encoders saw them), so a training / validation entity 
   8.19B, over the 8B limit), LoRA r 16 on 120k train records of folds 4–7 whose stage-1 p is unsure, raw text,
   logit(yes) − logit(no). On validation's 58.6k unsure rows it is weaker alone (AUC 0.844 vs 0.936 for stage 2) but
   complementary: a logistic blend with stage 2 gives 0.99297 vs 0.99277 (cross-fitted over the S1s).
-- **Self-training round 3** (`x_chain.py v10s3`): seeded by v10_fr2, cross-encoders continued from v10's.
+- **Self-training round 3** (`x_chain.py v10s3`): seeded by v10_fr2, cross-encoders continued from v10's. About 23 of
+  30 sampled extra rejections (6,095 records) are decoys; leaderboard +0.000135.
+- **bge-reranker-v2-m3 as a third cross-encoder** (`x_chain.py v10b`, in progress): Sarvesh's branch `bge-llm` measured
+  +0.00016 on v9p's validation (0.99277 → 0.99293) with the model trained on the old folds; v10b trains it on v10's
+  folds (`CE_TEXT=orig`: text as given, since the model reads case, accents and scripts itself).
 
 ## Leaderboard
 
 | File | Score |
 |---|---|
-| **v10_fr2** | **0.985942** |
+| **v10_fr3_llm** | **0.987071** |
+| v10_fr3 | 0.986077 |
+| v10_fr2 | 0.985942 |
 | v9p_frand | 0.984742 |
 | v9p | 0.982690 |
 | v7w | 0.982641 |
@@ -219,6 +231,9 @@ validation says (+0.0003 overall), France lost about 0.0017 in v8 / v9 (the Fran
 learned statistics). That puts France at about 0.931 in v9p and **0.945 in v9p_frand**, still the whole gap to the top.
 v10_fr2 adds +0.0012: about +0.0001 from v10 on US / India (validation) and +0.0011 from France (round-2 veto and the
 v10 model), so France is about **0.952**. A top-5 score (0.98857) needs France near 0.97.
+The round-3 veto adds +0.000135 (v10_fr3), and the LLM judge +0.000994 (v10_fr3_llm vs v10_fr3). Its validation gain
+(+0.0002 on US / India) explains about 0.00017, so about +0.0008 comes from France (+0.0055 on France alone): a
+multilingual model reads French decoys that models trained on US / India text cannot.
 
 What changed from v4 (0.967) besides the models, from teammates' reviews:
 - Mohanish: v4's stage 2 learned that an *averaged* stage-1 probability marks a distractor (only distractors of hash
@@ -274,6 +289,8 @@ FROM=France:_v9spw:min,France:_v9s2pw:min python x_final.py ../output_v10_fr2 _v
 python x_llm.py train && python x_llm.py val && python x_llm.py test   # Qwen3-Reranker-4B LoRA (LLM=/path)
 python x_llmstack.py _v9p _v10p      # blend into v10's unsure records -> work/x/test_q_v10plw.parquet
 FROM=France:_v9spw:min,France:_v9s2pw:min python x_final.py ../output_v10_fr2_llm _v10plw 0.70
+python x_chain.py v10s3              # self-training round 3, seeded by v10_fr2 -> work/x/test_q_v10s3pw.parquet
+FROM=France:_v9spw:min,France:_v9s2pw:min,France:_v10s3pw:min python x_final.py ../output_v10_fr3_llm _v10plw 0.70
 ```
 `x_chain.py` runs each step in order and logs it to `work/logs/<step>.log`; the plans list the exact commands and
 environment (`python x_chain.py <plan> <first_step>` resumes). `python x_final.py ../output_v9p _v9pw 0.70` writes

@@ -28,14 +28,18 @@ SELF = os.environ.get("SELF", "")            # self-training: a test q file (x_n
 SELF_C = os.environ.get("SELF_C", "")        # become labels, for these countries (default: countries without train labels)
 SELF_N = int(os.environ.get("SELF_N", 0))    # cap on pseudo-labelled pairs, 0 = all
 HI, LO = float(os.environ.get("SELF_HI", 0.98)), float(os.environ.get("SELF_LO", 0.02))
-TEXT = os.environ.get("CE_TEXT", "norm")    # norm: cached v4 normalisation | raw: transliterated, lowercased, punctuation kept
-TOK = AutoTokenizer.from_pretrained(BASE)
+TEXT = os.environ.get("CE_TEXT", "norm")    # norm: cached v4 normalisation | raw: transliterated, lowercased, punctuation
+TOK = AutoTokenizer.from_pretrained(BASE)   # kept | orig: as given (case, accents, scripts), for a multilingual reranker
 CLS, SEP, PAD = TOK.cls_token_id, TOK.sep_token_id, TOK.pad_token_id
 
 
 def _raw(na):
     from anyascii import anyascii
     return f"{anyascii(na[0]).lower()} | {anyascii(na[1]).lower()}"
+
+
+def _orig(na):
+    return f"{na[0].strip()} | {na[1].strip()}"
 
 
 def store(split, tag):
@@ -49,7 +53,8 @@ def store(split, tag):
             from common import load
             df = load(split, 1) if tag == "s1" else pd.concat([load(split, 2), load(split, 3)], ignore_index=True)
             with Pool(32) as p:
-                t = p.map(_raw, zip(df.business_name.tolist(), df.business_address.tolist()), chunksize=20000)
+                t = p.map(_orig if TEXT == "orig" else _raw, zip(df.business_name.tolist(), df.business_address.tolist()),
+                          chunksize=20000)
         flat, lens = [], []
         for i in range(0, len(t), 500_000):
             ids = TOK(t[i:i + 500_000], add_special_tokens=False, truncation=True, max_length=L)["input_ids"]

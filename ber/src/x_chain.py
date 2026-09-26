@@ -142,6 +142,16 @@ PLANS["v10s3"] = [("v10s3_seed", ["x_final.py", "-", "_v10pw"], {"FROM": "France
                   ("v10s3_ns_test", ["x_ce3.py", "score", "test"], _NS3),
                   ("v10s3_s1", ["x_stage_multi.py", "s1"], {**_ST3, "S1K": "3"}),
                   ("v10s3_s2p", ["x_nocopy.py", "test"], {**_ST3, "BAG": "5", "PEERS": "1"})]
+# v10b = v10 + BAAI/bge-reranker-v2-m3 (Apache-2.0, 568M, multilingual) as a third CE, as Sarvesh's bge-llm branch
+# (+0.00016 on v9p), trained on v10's folds (DFOLD) so no stage row has an in-sample bge score -> x/test_q_v10bpw
+_B10 = {**_D, "CE_BASE": "/scratch/scai/mtech/aib262144/models/bge-reranker-v2-m3", "CE_TEXT": "orig",
+        "CE_DIR": f"{WORK}/x/ce_b10", "CE_TAG": "_b10"}
+_STB = {**_D, "CE_TAGS": "_n10,_r10,_b10", "TAG": "_v10b"}
+PLANS["v10b"] = [("v10b_fit", ["x_ce3.py", "train"], {**_B10, "CE_N": "3000000", "CE_BS": "256", "CE_LR": "2e-5"}),
+                 ("v10b_train", ["x_ce3.py", "score", "train"], _B10),
+                 ("v10b_test", ["x_ce3.py", "score", "test"], _B10),
+                 ("v10b_s1", ["x_stage_multi.py", "s1"], {**_STB, "S1K": "3"}),
+                 ("v10b_s2p", ["x_nocopy.py", "test"], {**_STB, "BAG": "5", "PEERS": "1"})]
 ARGS = sys.argv[1:]
 PLAN = ARGS.pop(0) if ARGS and ARGS[0] in PLANS else "v5"   # python x_chain.py [plan] [first_step]
 STEPS = PLANS[PLAN]
