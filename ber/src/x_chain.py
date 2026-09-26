@@ -66,6 +66,38 @@ PLANS["v9"] = [("v9_verr", ["x_verr.py", "_v8"], {}),
                ("v9_s2_k3", ["x_nocopy.py", "test"], {**_V9, "TAG": "_v9k3", "BAG": "5"}),
                ("v9_s1_k6", ["x_stage_multi.py", "s1"], {**_V9, "TAG": "_v9k6", "S1K": "6"}),
                ("v9_s2_k6", ["x_nocopy.py", "test"], {**_V9, "TAG": "_v9k6", "BAG": "5"})]
+# v9b = v9 build: the shortlist that also sees text similarities, then v8's CEs (trained on the retrieved top-5, so
+# they only re-score), stage 1 with 3 fold groups and a 5-seed stage 2 -> x/test_q_v9w. Move the v8 feats2 / extra /
+# ce / oof caches aside first (features() reuses an existing feats2). stage1v4 only refreshes the v4 p, so it runs last.
+_SL9 = os.environ.get("SHORTLIST", "text:0.001")
+_RAW = {"CE_TEXT": "raw", "CE_DIR": f"{WORK}/x/ce_raw", "CE_TAG": "_raw"}
+PLANS["v9b"] = [
+    ("v9_features", ["-c", "from match import features; features('train'); features('test')"], {"SHORTLIST": _SL9}),
+    ("v9_extra", ["-c", "import x_feats; x_feats.main('train'); x_feats.main('test')"], {}),
+    ("v9_ce_score_train", ["x_ce.py", "score", "train"], {}),
+    ("v9_ce_score_test", ["x_ce.py", "score", "test"], {}),
+    ("v9_raw_score_train", ["x_ce3.py", "score", "train"], _RAW),
+    ("v9_raw_score_test", ["x_ce3.py", "score", "test"], _RAW),
+    ("v9_s1", ["x_stage_multi.py", "s1"], {**_V9, "TAG": "_v9", "S1K": "3"}),
+    ("v9_s2", ["x_nocopy.py", "test"], {**_V9, "TAG": "_v9", "BAG": "5"}),
+    ("v9_stage1v4", ["stage1_cv.py"], {})]
+# v9s = v9 with both CEs continued on confident test decisions of the countries without train labels (self-training,
+# x_ce3.py train with SELF=x/test_q_v8w.parquet -> x/ce_ns, x/ce_rs), re-scored and restacked -> x/test_q_v9sw
+_RS = {"CE_TEXT": "raw", "CE_DIR": f"{WORK}/x/ce_rs", "CE_TAG": "_rs"}
+_NS = {"CE_DIR": f"{WORK}/x/ce_ns", "CE_TAG": "_ns"}
+_ST = {"CE_TAGS": "_ns,_rs", "TAG": "_v9s"}
+_SELF = {"SELF": f"{WORK}/x/test_q_v8w.parquet", "CE_N": "3000000", "SELF_N": "4000000", "CE_LR": "2e-5"}
+PLANS["v9s"] = [("v9s_rs_fit", ["x_ce3.py", "train"], {**_RS, "CE_INIT": f"{WORK}/x/ce_raw", **_SELF}),
+                ("v9s_ns_fit", ["x_ce3.py", "train"], {**_NS, "CE_INIT": f"{WORK}/x/ce", **_SELF}),
+                ("v9s_rs_train", ["x_ce3.py", "score", "train"], _RS),
+                ("v9s_rs_test", ["x_ce3.py", "score", "test"], _RS),
+                ("v9s_ns_train", ["x_ce3.py", "score", "train"], _NS),
+                ("v9s_ns_test", ["x_ce3.py", "score", "test"], _NS),
+                ("v9s_s1", ["x_stage_multi.py", "s1"], {**_ST, "S1K": "3"}),
+                ("v9s_s2", ["x_nocopy.py", "test"], {**_ST, "BAG": "5"}),
+                ("v9s_s2p", ["x_nocopy.py", "test"], {**_ST, "BAG": "5", "PEERS": "1"})]   # -> x/test_q_v9spw
+# v9p = v9 + house-number peer context in stage 2 -> x/test_q_v9pw
+PLANS["v9p"] = [("v9_s2p", ["x_nocopy.py", "test"], {**_V9, "TAG": "_v9", "BAG": "5", "PEERS": "1"})]
 ARGS = sys.argv[1:]
 PLAN = ARGS.pop(0) if ARGS and ARGS[0] in PLANS else "v5"   # python x_chain.py [plan] [first_step]
 STEPS = PLANS[PLAN]

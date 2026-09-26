@@ -15,8 +15,10 @@ KF = int(os.environ.get("KF", 5))  # candidates per S2/S3 record that go to the 
 #   SHORTLIST="softmax:T:c"  per record, the fewest top candidates whose softmax(score / T) sums to >= c  (Sarvesh)
 #   SHORTLIST="gap:d"        per record, every candidate scoring within d of the record's best             (Sarvesh)
 #   SHORTLIST="model:tau"    candidates whose calibrated probability (shortlist.py, retrieval features only) >= tau
+#   SHORTLIST="text:tau"     the same, from the model that also sees name / address similarities (x_shortlist2.py)
 SHORTLIST = os.environ.get("SHORTLIST", "")
 SHORT_F = ["score", "rank", "gap_top1", "gap_next", "top1", "n02", "n05", "n10", "soft"]
+TXT = ["t_nn", "t_cn", "t_na", "t_nn_gap", "t_cn_gap", "t_na_gap"]
 OUT = os.environ.get("OUT", f"{ROOT}/output")
 _NUM = re.compile(r"\d+")
 _ZIP = re.compile(r"\b\d{5,6}\b")
@@ -116,8 +118,17 @@ def retrieval_feats(c):
     return c
 
 
-def keep_mask(c):
-    """which retrieved candidates go to the matcher (see SHORTLIST)."""
+def text_feats(c, n1, n2):
+    """rapidfuzz name / core-name / address similarity of each retrieved pair, and its gap to the record's best."""
+    P = dict(workers=-1, dtype=np.float32)
+    for name, col, scorer in (("t_nn", "nn", fuzz.token_set_ratio), ("t_cn", "cn", fuzz.ratio), ("t_na", "na", fuzz.token_set_ratio)):
+        c[name] = process.cpdist(n1[col].values[c.sid.values].tolist(), n2[col].values[c.rid.values].tolist(), scorer=scorer, **P)
+        c[name + "_gap"] = c.groupby("rid")[name].transform("max").values - c[name].values
+    return c
+
+
+def keep_mask(c, n1=None, n2=None):
+    """which retrieved candidates go to the matcher (see SHORTLIST); "text" needs the normalised S1 / other tables."""
     if not SHORTLIST:
         return (c["rank"] < KF).to_numpy()
     kind, *args = SHORTLIST.split(":")
@@ -129,9 +140,12 @@ def keep_mask(c):
         g = pd.Series(e).groupby(c.rid.to_numpy())
         before = (g.cumsum() - e) / g.transform("sum")          # probability mass of the better-ranked candidates
         return (before < float(cut) - 1e-9).to_numpy()          # keep until the running total reaches c
-    assert kind == "model", SHORTLIST
-    m = lgb.Booster(model_file=f"{WORK}/shortlist.txt")
-    return m.predict(c[SHORT_F], num_threads=32) >= float(args[0])
+    assert kind in ("model", "text"), SHORTLIST
+    F = SHORT_F
+    if kind == "text":
+        c, F = text_feats(c, n1, n2), SHORT_F + TXT
+    m = lgb.Booster(model_file=f"{WORK}/shortlist{'_text' if kind == 'text' else ''}.txt")
+    return m.predict(c[F], num_threads=32) >= float(args[0])
 
 
 def _features(split):
@@ -139,7 +153,7 @@ def _features(split):
     other = pd.concat([load(split, 2), load(split, 3)], ignore_index=True)
     n2 = pd.concat([normed(split, 2), normed(split, 3)], ignore_index=True)
     c = retrieval_feats(pd.read_parquet(f"{WORK}/cand_{split}.parquet"))   # context from the full top-20 list
-    c = c[keep_mask(c)]
+    c = c[keep_mask(c, n1, n2)]
     if os.environ.get("SMOKE"):
         c = c[c.rid < 20000]
     c = c.reset_index(drop=True)

@@ -4,21 +4,16 @@ Both models fit on train records of S1 folds 4-6 and are compared on folds 7-9 a
 comparison per retrieved pair (linear in records x K), so it scales like the retrieval itself.
   python x_shortlist2.py     (needs the normalisation caches built by match.features)"""
 import numpy as np, pandas as pd, lightgbm as lgb
-from rapidfuzz import process, fuzz
 from common import WORK
 from harness import truth_arrays
-from match import retrieval_feats, SHORT_F, normed
+from match import retrieval_feats, text_feats, SHORT_F, TXT, normed
 
 s1, other, ts, s1f, rf = truth_arrays()
 c = pd.read_parquet(f"{WORK}/cand_train.parquet")
 c = retrieval_feats(c[rf[c.rid.values] >= 4].sort_values(["rid", "rank"]).reset_index(drop=True))
 n1 = normed("train", 1)
 n2 = pd.concat([normed("train", 2), normed("train", 3)], ignore_index=True)
-P = dict(workers=-1, dtype=np.float32)
-for name, col, scorer in (("t_nn", "nn", fuzz.token_set_ratio), ("t_cn", "cn", fuzz.ratio), ("t_na", "na", fuzz.token_set_ratio)):
-    c[name] = process.cpdist(n1[col].values[c.sid.values].tolist(), n2[col].values[c.rid.values].tolist(), scorer=scorer, **P)
-    c[name + "_gap"] = c.groupby("rid")[name].transform("max").values - c[name].values
-TXT = ["t_nn", "t_cn", "t_na", "t_nn_gap", "t_cn_gap", "t_na_gap"]
+c = text_feats(c, n1, n2)
 r = c.rid.values
 y = ts[r] == c.sid.values
 tr, ev = np.isin(rf[r], [4, 5, 6]) & (r % 4 == 0), np.isin(rf[r], [7, 8, 9])

@@ -7,7 +7,7 @@ their owner's fold, distractors their hash fold).
 import os, sys, json, numpy as np, pandas as pd, lightgbm as lgb
 from common import WORK, ROOT, load
 from harness import truth_arrays, score
-from match import to_sets, write_tsv
+from match import to_sets, write_tsv, normed
 from stage2 import best_rows, context, S1F, PARAMS as P2
 import x_feats as XF
 
@@ -22,6 +22,8 @@ EXF = [] if NOCE or os.environ.get("NOEXTRA") else [c for c in XF.COLS   # x_fea
                                                       if c not in os.environ.get("EXF_DROP", "").split(",")]
 # stage-1 cross-fitting over the S1 folds 4-9: S1K=2 (two models, as v5-v8), 3 or 6 (each model sees more data,
 # test averages more models)
+PEERS = bool(os.environ.get("PEERS"))   # stage 2 also sees the records claiming the same S1 at the same house number
+QTAG = TAG + ("p" if PEERS else "")     # stage-2 artefacts of a PEERS run get their own name
 S1K = int(os.environ.get("S1K", 2))
 GROUPS = {2: [[4, 5, 6], [7, 8, 9]], 3: [[4, 5], [6, 7], [8, 9]], 6: [[f] for f in range(4, 10)]}[S1K]
 LLRF = [f"{f}_{e}_{t}" for f in ("n", "a") for e in ("add", "drop") for t in ("sum", "min", "max", "cnt")]     if os.environ.get("LLR") else []   # x_llr.py word-edit log-likelihood ratios
@@ -93,9 +95,32 @@ def s1():
     print("stage 1 done", flush=True)
 
 
+def peers(d):
+    """entity context by house number (first integer of the record's address): a decoy entity's records share its
+    altered number, so how the other records at this number that claim the same S1 score is evidence for this one."""
+    d = d.sort_values(["sid", "kr", "p"], ascending=[True, True, False]).reset_index(drop=True)
+    sid, kr, p = d.sid.values, d.kr.values, d.p.values.astype(np.float64)
+    start = np.r_[True, (sid[1:] != sid[:-1]) | (kr[1:] != kr[:-1])]
+    gid = np.cumsum(start) - 1
+    b = np.flatnonzero(np.r_[start, True])
+    size = np.diff(b)[gid]
+    first = np.arange(len(d)) == b[:-1][gid]
+    top2 = np.where(size > 1, p[np.minimum(b[:-1] + 1, len(p) - 1)][gid], 0.0)
+    none = kr < 0
+    d["e_np_n"] = np.where(none, np.nan, size - 1)
+    d["e_np_max"] = np.where(none, np.nan, np.where(first, top2, p[b[:-1]][gid]))
+    d["e_np_sum"] = np.where(none, np.nan, np.bincount(gid, weights=p)[gid] - p)
+    nk = d[~none].groupby("sid").kr.nunique()
+    d["e_np_keys"] = d.sid.map(nk).fillna(0).values.astype(np.float32)
+    return d
+
+
 def rows(split, k):
     """one row per record: its stage-1 argmax S1 + that pair's stage-1 / CE features."""
     b = best_rows(k)
+    if PEERS:
+        num = pd.concat([normed(split, 2), normed(split, 3)], ignore_index=True).num.values
+        b["kr"] = [int(num[r].split()[0][:15]) if num[r] else -1 for r in b.rid.values]
     F = pd.read_parquet(f"{WORK}/feats2_{split}.parquet", columns=S1F)
     parts = [b, F.iloc[b.i.values].reset_index(drop=True)]
     if not NOCE:

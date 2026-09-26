@@ -4,6 +4,8 @@ distractors with hash fold 0-3) - the embedder's folds - so its scores are out-o
   python x_ce.py prep               # tokenise every record once
   python x_ce.py train              # fine-tune on folds 0-3 pairs, then a quick fold-9 check vs stage-1
   python x_ce.py score train|test   # logit for every top-5 pair (feats2 row order); NaN where in-sample
+  SELF=x/test_q_v8w.parquet CE_INIT=x/ce_raw ... python x_ce3.py train   # continue a CE on confident test decisions
+                                    # of the countries without train labels (self-training, labels never used)
 """
 import os, sys, math, time, numpy as np, pandas as pd, torch
 from multiprocessing import Pool
@@ -21,6 +23,11 @@ BS = int(os.environ.get("CE_BS", 512))
 LR = float(os.environ.get("CE_LR", 5e-5))
 NMAX = int(os.environ.get("CE_N", 0))        # cap on training pairs, 0 = all
 EPOCHS = float(os.environ.get("CE_EPOCHS", 1))
+INIT = os.environ.get("CE_INIT", BASE)      # weights to start from (an already trained CE to continue it)
+SELF = os.environ.get("SELF", "")            # self-training: a test q file (x_nocopy test) whose confident decisions
+SELF_C = os.environ.get("SELF_C", "")        # become labels, for these countries (default: countries without train labels)
+SELF_N = int(os.environ.get("SELF_N", 0))    # cap on pseudo-labelled pairs, 0 = all
+HI, LO = float(os.environ.get("SELF_HI", 0.98)), float(os.environ.get("SELF_LO", 0.02))
 TEXT = os.environ.get("CE_TEXT", "norm")    # norm: cached v4 normalisation | raw: transliterated, lowercased, punctuation kept
 TOK = AutoTokenizer.from_pretrained(BASE)
 CLS, SEP, PAD = TOK.cls_token_id, TOK.sep_token_id, TOK.pad_token_id
@@ -123,11 +130,31 @@ def auc(y, sc):
     return (rk[y].sum() - npos * (npos + 1) / 2) / (npos * (len(y) - npos))
 
 
+def cat(X, Y):
+    """one ragged store from two; ids of the second are shifted by the first's length."""
+    return np.concatenate((X[0], Y[0])), np.concatenate((X[1], Y[1][1:] + X[1][-1]))
+
+
+def pseudo(train_countries, rng):
+    """(S1, record, label) from test: the top-5 candidates of records whose best candidate is confident. q >= HI:
+    that candidate 1, the record's others 0 (a record has at most one S1); q <= LO: all 0."""
+    q = pd.read_parquet(SELF)
+    ctry = SELF_C.split(",") if SELF_C else sorted(set(q.c) - set(train_countries))
+    q = q[q.c.isin(ctry)]
+    pos = q[q.q >= HI]
+    c = pd.read_parquet(f"{WORK}/cand_test.parquet", columns=["rid", "sid", "rank"])
+    c = c[(c["rank"].values < 5) & np.isin(c.rid.values, np.r_[pos.rid.values, q.rid.values[q.q <= LO]])]
+    c = pd.concat([c[["rid", "sid"]], pos[["rid", "sid"]]]).drop_duplicates()
+    y = c.rid.map(pos.set_index("rid").sid).values == c.sid.values
+    sel = np.arange(len(c)) if not SELF_N or SELF_N >= len(c) else rng.choice(len(c), SELF_N, replace=False)
+    print(f"pseudo-labels {ctry}: {len(q)} records, {len(pos)} confident matches, {(q.q <= LO).sum()} confident "
+          f"no-match; {len(sel)} pairs, pos {y[sel].mean():.3f}", flush=True)
+    return c.sid.values[sel], c.rid.values[sel], y[sel]
+
+
 def train():
     s1, other, ts, s1f, rf = truth_arrays()
     A, B = store("train", "s1"), store("train", "other")
-    k = pd.read_parquet(f"{WORK}/feats2_train.parquet", columns=["rid", "sid"])
-    r, s = k.rid.values, k.sid.values
     # training pairs: the retrieved top-5 of S1 folds 0-3, not the matcher's shortlist, so the CE keeps seeing
     # wrong-S1 candidates as negatives whatever the shortlist keeps
     c = pd.read_parquet(f"{WORK}/cand_train.parquet", columns=["rid", "sid", "rank"])
@@ -138,12 +165,16 @@ def train():
     if NMAX and NMAX < len(sel):
         sel = rng.choice(sel, NMAX, replace=False)
     a, b, y = cs[sel], cr[sel], ts[cr[sel]] == cs[sel]
+    if SELF:
+        pa, pb, py = pseudo(s1.country.unique(), rng)
+        a, b, y = np.r_[a, pa + len(A[1]) - 1], np.r_[b, pb + len(B[1]) - 1], np.r_[y, py]
+        A, B = cat(A, store("test", "s1")), cat(B, store("test", "other"))
     lens = plen(A, B, a, b)
     batches = [bt for _ in range(math.ceil(EPOCHS)) for bt in bucketed(lens, BS, rng)]
     batches = batches[:int(len(batches) * EPOCHS / math.ceil(EPOCHS))]
     steps = len(batches)
-    print(f"train pairs {len(a)}  pos {y.mean():.3f}  steps {steps}  lr {LR}  base {BASE}", flush=True)
-    model = AutoModelForSequenceClassification.from_pretrained(BASE, num_labels=1, attn_implementation="sdpa").cuda()
+    print(f"train pairs {len(a)}  pos {y.mean():.3f}  steps {steps}  lr {LR}  init {INIT}", flush=True)
+    model = AutoModelForSequenceClassification.from_pretrained(INIT, num_labels=1, attn_implementation="sdpa").cuda()
     opt = torch.optim.AdamW(model.parameters(), lr=LR, weight_decay=0.01)
     sched = get_linear_schedule_with_warmup(opt, int(0.03 * steps), steps)
     model.train(); t0 = time.time(); run = 0.0
@@ -159,7 +190,11 @@ def train():
         if step % 500 == 0:
             print(f"step {step}/{steps}  loss {run:.4f}  {(step + 1) * BS / (time.time() - t0):.0f} pairs/s", flush=True)
     model.save_pretrained(CE); TOK.save_pretrained(CE)
+    if SELF:   # the fold-9 check below reads the v4 feats2 / oof caches, which a rebuild may be replacing
+        return
     # quick check on fold 9 (never seen by the CE or the embedder): pair AUC and argmax accuracy vs stage-1 OOF
+    k = pd.read_parquet(f"{WORK}/feats2_train.parquet", columns=["rid", "sid"])
+    r, s = k.rid.values, k.sid.values
     p1 = pd.read_parquet(f"{WORK}/oof_train.parquet", columns=["p"]).p.values
     recs = np.unique(r[rf[r] == 9])
     v = np.flatnonzero(np.isin(r, rng.choice(recs, min(len(recs), 600_000), replace=False)))  # whole candidate lists

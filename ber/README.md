@@ -2,14 +2,15 @@
 
 Match every Source 2 / Source 3 record to the Source 1 (reference) entity it belongs to, scored by macro F0.5.
 
-**Leaderboard best: v7w, 0.982641** (2026-09-25). A France probe puts US + India at about 0.991 and France at about
-0.933 (see [Leaderboard](#leaderboard)).
-**Current pipeline: v8** (2026-09-26): the same validation score as v7w (0.99236 vs 0.99240, copy-free) with scalable
-blocking (FAISS HNSW search + a calibrated shortlist: 65% fewer candidate pairs than top-5), no hand-written
-abbreviation / legal-form / country tables (a lexicon learned per country from the records), and one decision rule for
-every country. Its leaderboard score is pending.
+**Leaderboard best: v9p_frand, 0.984742** (2026-09-26; v7w was 0.982641). The public and private leaderboards are both
+subsets of the provided test file, so every country scored is one we see: US, India and France.
+**Current pipeline: v9p_frand**: the v8 design (scalable HNSW blocking + calibrated shortlist, a lexicon learned per
+country, no hand-written tables) with a shortlist that also sees text similarities (7.4 candidate pairs per S1 on test,
+v8 10.0, top-5 28.7), stage 2 that also sees the records claiming the same S1 at the same house number (validation
+0.99277, v8 0.99236), and, for the country without training labels (France), cross-encoders self-trained on their own
+confident test decisions, used as a veto (+0.00205 on the leaderboard, i.e. +0.014 on France alone).
 
-## Algorithm (v8)
+## Algorithm (v9p_frand)
 
 Key observation from the training ground truth: **every S2/S3 record belongs to at most one S1 entity**
 (7.6M matched ids, none reused), ~26% of S2/S3 records match nothing, and only 5.6% of S1 entities are singletons.
@@ -39,9 +40,12 @@ labels: nothing below names a country or a language.
 2. **Blocking** (`train_embed.py`, `retrieve.py`, `shortlist.py`, `match.py`): `intfloat/multilingual-e5-small` (MIT,
    118M) fine-tuned with in-batch negatives on (record, its S1) pairs of S1 folds 0–3 embeds every record. Each record
    takes its top-20 S1 records **with the same country label** from a FAISS HNSW index (M 32, efSearch 512), so a query
-   costs about log(#S1) instead of #S1. A **calibrated shortlist** (a small LightGBM on retrieval-only features: cosine,
-   rank, gaps to the best and next candidate, near-ties, softmax share) keeps candidates with P ≥ 0.002. Those pairs are
-   exactly what the matcher scores and what `candidate_pairs.tsv` lists (see [Blocking](#blocking)).
+   costs about log(#S1) instead of #S1. A **calibrated shortlist** (`x_shortlist2.py`, a small LightGBM on retrieval
+   features — cosine, rank, gaps to the best and next candidate, near-ties, softmax share — and three rapidfuzz
+   similarities per pair — name token-set, core-name ratio, address token-set — with each one's gap to the record's
+   best) keeps candidates with P ≥ 0.001 (`SHORTLIST=text:0.001`). One similarity per retrieved pair, so it scales like
+   the retrieval. Those pairs are exactly what the matcher scores and what `candidate_pairs.tsv` lists (see
+   [Blocking](#blocking)).
 3. **Pair features** (`match.py features`, `x_feats.py`): embedding score, rank and gaps; rapidfuzz similarities on
    full, core and consonant-skeleton names and on addresses; numbers, token rarity, name frequency; integer-aware
    house numbers; legal-form edits over the learned families; name edits between core names (typo-tolerant words
@@ -52,13 +56,28 @@ labels: nothing below names a country or a language.
    punctuation and suffix spellings; the best single model). Each adds its score, its rank within the record, the gap
    to the record's next candidate, its rank within the S1 and the S1's positive claims. (The e5-base cross-encoder of
    v6/v7 is dropped: +0.00003.)
-5. **Stage 1** (`x_stage_multi.py s1`): LightGBM on pair + cross-encoder features, cross-fitted over S1 folds 4–9
-   (4–6 and 7–9). Each train pair gets the probability of the model that did not see it; test pairs get the mean.
+   **Self-training for countries without training labels** (`x_ce3.py train` with `SELF=`; France here): both
+   cross-encoders are continued on test pairs of that country whose v8 decision was confident: q ≥ 0.98 makes the
+   record's best S1 a match and its other top-5 candidates non-matches (a record has at most one S1), q ≤ 0.02 makes
+   all its top-5 non-matches. 4M pairs drawn from the lists of 806k confidently matched and 429k confidently unmatched
+   records are mixed with 3M train pairs so US / India are kept, one pass at lr 2e-5. No labels are used; the organisers' Q&A allows self-training on
+   the test records.
+5. **Stage 1** (`x_stage_multi.py s1`, `S1K=3`): LightGBM on pair + cross-encoder features, cross-fitted over S1
+   folds 4–9 in three groups (4–5, 6–7, 8–9). Each train pair gets the probability of the model that did not see it;
+   test pairs get the mean of the three.
 6. **Stage 2** (`x_nocopy.py`): each record's best candidate is re-scored with entity context, i.e. the other records
    claiming the same S1 (how many above 0.9 / 0.5 / 0.2, their sum and max, rank, same-source claims). Test has about
    39% distractors against 26% in train, so distractors are **weighted** (each appears once, weight 3.04); repeating
-   them creates identical twins that test never has.
-7. **Decision** (`x_final.py`): accept a record if its stage-2 score is ≥ 0.70, the same rule for every country.
+   them creates identical twins that test never has. **House-number peers** (`PEERS=1`): a distractor entity's records
+   share its altered house number (an S1 at 14 Impasse des Gardénias has its decoys at 15, whatever else they change),
+   so stage 2 also sees the other records claiming the same S1 with the same first address number: how many, their
+   best and summed stage-1 probability, and how many distinct numbers claim the S1. Five seeds are averaged (`BAG=5`).
+7. **Decision** (`x_final.py`): accept a record if its stage-2 score is ≥ 0.70, the same threshold for every country.
+   For a country without training labels, the self-trained stack acts as a veto: a record is accepted only if both
+   stacks accept it for the same S1 (`FROM=France:_v9spw:min`). Reading 30 random records of each kind of
+   disagreement, about 80% of the records the self-trained stack newly rejects are decoys ("& Associés", "Et Fils",
+   "Développement", a swapped word, a changed legal form plus a new number), while about 45% of those it newly accepts
+   are decoys too: it partly learned "same address, so same entity" from its own confident decisions.
 
 Folds: `crc32(S1 id) % 10`; 0–3 train the bi-encoder and the cross-encoders, 4–9 train stages 1 and 2. Stage 2 is
 validated on entity folds 8–9 after fitting on 4–7. Distractors follow their own hash fold, and those in 0–3 are left
@@ -74,12 +93,14 @@ neither the bi-encoder nor the shortlist model saw; `shortlist.py`):
 | top-5 (v4–v7) | 98.95% (exact search: 99.02%) | 5.00 | 23.4 |
 | top-20 | 99.42% | 20.0 | 93.5 |
 | Sarvesh's gap 0.1 | 99.35% | 1.99 | 9.3 |
-| **calibrated, P ≥ 0.002 (v8)** | **99.34%** | **1.46** | **6.8** |
+| calibrated, P ≥ 0.002 (v8) | 99.34% | 1.46 | 6.8 |
 | calibrated, P ≥ 0.005 | 99.28% | 1.34 | 6.3 |
+| calibrated + text similarities, P ≥ 0.002 | 99.38% | 1.22 | 5.7 |
+| **calibrated + text similarities, P ≥ 0.001 (v9)** | **99.39%** | **1.25** | **5.9** |
 
-On test, v8 scores 17.25M pairs instead of 49.8M: 1.24 candidates per record in the US, 1.66 in India, 3.25 in France
-(French names reuse a small vocabulary, so near-ties between namesakes are common and the model keeps them). Per S1:
-mean 7.2 / 9.7 / 18.0, median 7 / 8 / 11.
+On test, v9 scores 12.76M pairs (v8 17.25M, top-5 49.8M). Candidate pairs per S1, mean / median: US 6.6 / 6, India
+7.1 / 7, France 10.1 / 8 (v8: 7.2 / 7, 9.7 / 8, 18.0 / 11). French names reuse a small vocabulary, so namesakes are
+close in embedding space; the text similarities tell them apart and cut France's list by 44%.
 
 Search (`x_ann.py`, share of real records whose true S1 is found):
 
@@ -112,10 +133,19 @@ Validation: entity folds 8–9, distractors at the test share of 39%, macro F0.5
 | v7 | + raw-text cross-encoder | 0.99304 copies | – |
 | v5w | v5, stage 2 without distractor copies | 0.99186 copy-free | – |
 | **v7w** | v7, stage 2 without copies, threshold 0.70 everywhere + France word rule | **0.99240 copy-free** | **0.982641** |
-| **v8** | HNSW + calibrated shortlist, learned lexicon, name-edit features, no e5-base CE, no country rules | **0.99236 copy-free** | pending |
+| v8 | HNSW + calibrated shortlist, learned lexicon, name-edit features, no e5-base CE, no country rules | 0.99236 copy-free | not uploaded |
+| v9 | shortlist with text similarities, stage 1 over 3 fold groups, 5-seed stage 2 | 0.99252 copy-free | – |
+| v9p | + house-number peers in stage 2 | 0.99277 copy-free | 0.982690 |
+| v9s | cross-encoders self-trained on France (costs US / India a little) | 0.99245 copy-free | – |
+| **v9p_frand** | v9p; a France record needs the self-trained stack (v9s + peers) to agree | **0.99277** (US / India = v9p) | **0.984742** |
+
+Validation scores are at threshold 0.70 from v9 on.
 
 Tried without gain: word-edit log-likelihood features (`x_llr.py`, 0.99274 vs 0.99273), re-ranking each record's top
-2 (`x_top2.py`, 0.99278 either way), an expected-F0.5 decision per S1 instead of a threshold (v3: 0.9775 vs 0.9788).
+2 (`x_top2.py`, 0.99278 either way), an expected-F0.5 decision per S1 instead of a threshold (v3: 0.9775 vs 0.9788),
+six stage-1 fold groups instead of three (0.99234 vs 0.99241), separate thresholds per score bucket (`x_verr.py`,
++0.00001 to +0.00005), taking every France decision from the self-trained stack instead of using it as a veto
+(`v9p_frs`, see step 7).
 
 Cross-encoders on their own (fold 9, share of real records whose argmax is the right S1): normalised e5-small 0.98237,
 e5-base 0.98211, raw-text e5-small 0.98290; pair AUC 0.99984–0.99986. They add value through stacking.
@@ -127,10 +157,13 @@ blocking misses are records with an empty address whose name is shared by severa
 
 | File | Score |
 |---|---|
+| **v9p_frand** | **0.984742** |
+| v9p | 0.982690 |
 | v7w | 0.982641 |
 | v7w with every France S1 left empty (probe) | 0.851155 |
 | v4, Sarvesh's run | 0.967214 |
 | Rank 1 (2026-09-25 ~22:45) | 0.988319 |
+| 5th place (2026-09-26 morning) | > 0.988 |
 
 An empty prediction scores 1 on an S1 with no true matches and 0 otherwise. France is s = 259,452 / 1,732,544 =
 14.975% of test S1s, and about e = 5.5% of them should have no match (train prior and our predictions). So:
@@ -138,6 +171,11 @@ An empty prediction scores 1 on an S1 with no true matches and 0 otherwise. Fran
 - France ≈ (best − probe) / s + e = **0.933** (±0.005 from e).
 
 France costs about 0.009 of the overall score. At the US/India level the total would be about 0.991.
+
+v9p and v9p_frand differ only in France (23.6k of its 1.42M records), so their difference is France's alone:
+0.002052 / s = **+0.0137 on France** from the self-trained veto. v9p against v7w is +0.00005; if US / India gained what
+validation says (+0.0003 overall), France lost about 0.0017 in v8 / v9 (the France word rule of v7w was replaced by
+learned statistics). That puts France at about 0.931 in v9p and **0.945 in v9p_frand**, still the whole gap to the top.
 
 What changed from v4 (0.967) besides the models, from teammates' reviews:
 - Mohanish: v4's stage 2 learned that an *averaged* stage-1 probability marks a distractor (only distractors of hash
@@ -164,32 +202,45 @@ cross-encoders start from the fine-tuned copy. (`intfloat/multilingual-e5-base` 
 Data: place (or symlink) the provided `student_resource/` folder next to `src/`, or set `AMLC_ROOT` to the folder that
 contains it. Caches, models and logs go to `$AMLC_ROOT/work`.
 
-### Run v8 (from `src/`; one A100 80GB, ~32 cores, ~200 GB RAM; about 8 h end to end)
+### Run v9p_frand (from `src/`; one A100 80GB, ~32 cores, ~200 GB RAM; about 12 h end to end)
 ```bash
 python common.py                     # self-checks for tokenisation, normalisation and the F0.5 scorer
 python train_embed.py                # fine-tune the e5-small bi-encoder on S1 folds 0-3             (~10 min)
 python x_chain.py v8a                # HNSW retrieval (train, test), learned lexicon, shortlist model (~2.2 h)
 SHORTLIST=model:0.002 python x_chain.py v8b
-                                     # shortlisted pair features, name-edit / legal features, v4 stage 1 (the CE
-                                     # sanity checks read it), both cross-encoders trained and scored, stage 1,
-                                     # stage 2 without distractor copies -> work/x/test_q_v8w.parquet    (~4.5 h)
-python x_final.py ../output_v8 _v8w 0.70   # matching_results.tsv + candidate_pairs.tsv
+                                     # v8: shortlisted pair features, name-edit / legal features, both
+                                     # cross-encoders trained and scored, stages -> work/x/test_q_v8w.parquet,
+                                     # whose confident France decisions seed the self-training     (~4.5 h)
+python x_shortlist2.py               # shortlist model with text similarities -> work/shortlist_text.txt
+# features() reuses an existing work/feats2_*.parquet: move v8's pair caches aside first
+mkdir -p ../work/archive_v8/x && mv ../work/feats2_*.parquet ../work/oof_train.parquet ../work/p1_test.parquet \
+  ../work/archive_v8/ && mv ../work/x/ce_{train,test}.npy ../work/x/ce_raw_{train,test}.npy \
+  ../work/x/extra_{train,test}.parquet ../work/archive_v8/x/
+python x_chain.py v9b                # text shortlist (P >= 0.001), features, CE scoring, stage 1 over 3 groups,
+                                     # 5-seed stage 2 -> work/x/test_q_v9w.parquet                    (~1 h)
+python x_chain.py v9p                # + house-number peers -> work/x/test_q_v9pw.parquet
+python x_chain.py v9s                # both CEs continued on confident France decisions of v8, re-scored,
+                                     # stages with and without peers -> work/x/test_q_v9spw.parquet   (~1.5 h)
+FROM=France:_v9spw:min python x_final.py ../output_v9p_frand _v9pw 0.70   # matching_results + candidate_pairs
 ```
 `x_chain.py` runs each step in order and logs it to `work/logs/<step>.log`; the plans list the exact commands and
-environment. The v8 submission reused the raw-text cross-encoder trained in v7 (on the exact-search top-5); the
-`v8b` plan retrains it. `BLANK=<country> python x_final.py ...` writes a leaderboard probe with that country's S1s
-left empty; `python x_final.py sweep _v8w` prints each country's no-match rate and matches per S1 by threshold.
+environment (`python x_chain.py <plan> <first_step>` resumes). `python x_final.py ../output_v9p _v9pw 0.70` writes
+v9p. `BLANK=<country>` writes a leaderboard probe with that country's S1s left empty, `THR_C=France:0.8` sets one
+country's threshold, and `python x_final.py sweep _v9pw` prints each country's no-match rate and matches per S1 by
+threshold. `x_frdiag.py <tag>` prints each country's score histogram and sample S1 groups from the unsure band.
 
 Validate (from this folder):
 ```bash
 cd student_resource && python3 utils/validate_submission.py --check-ids \
-  --matching ../output_v8/matching_results.tsv --candidate ../output_v8/candidate_pairs.tsv --test-dir dataset/test
+  --matching ../output_v9p_frand/matching_results.tsv --candidate ../output_v9p_frand/candidate_pairs.tsv --test-dir dataset/test
 ```
 
 No external databases, APIs or lookup services are used at any stage, and since v8 there are no hand-written word
 lists either: abbreviations, legal forms and word statistics are learned from the provided records (test records
-without labels, as allowed for unsupervised statistics).
+without labels, as allowed for unsupervised statistics), and the self-training uses only the pipeline's own confident
+decisions on the test records.
 
-Known limits of v8: HNSW finds the true S1 about 0.09 points less often than exact search at @20; France's EURL fell
-just under the learned legal-form cut; the "inserted word" statistic also flags harmless US / India insertions (www,
-dba, honorifics), so its effect on France has to be checked on the leaderboard.
+Known limits: HNSW finds the true S1 about 0.09 points less often than exact search at @20; France's EURL fell just
+under the learned legal-form cut; the "inserted word" statistic flags decoy words (participations, holding, associés)
+and harmless ones alike (www, dba, Indian honorifics), so the models lean on it little; the self-trained
+cross-encoders take the address as proof of identity, so their new acceptances are not used.
