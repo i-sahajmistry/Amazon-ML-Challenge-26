@@ -60,6 +60,20 @@ def select(split):
     rid1, p1 = k.rid.values[first], k.p.values[first]
     p2 = pd.Series(k.p.values[g == 1], index=k.rid.values[g == 1]).reindex(rid1).fillna(0.0).values
     unsure, ambig = (p1 >= P1[0]) & (p1 < P1[1]), p2 >= P2
+    if split == "train" and os.environ.get("LLM_HELD_FOLDS"):
+        # held-out country (leave-one-country-out): judge only records whose best S1 is in these crc folds, the
+        # evaluation group loco_eval.py reports separately, to save GPU time
+        import zlib
+        from common import HELD
+        folds = [int(x) for x in os.environ["LLM_HELD_FOLDS"].split(",")]
+        held = rf[rid1] == HELD
+        s1ids = load("train", 1).entity_id.values
+        sid1 = k.sid.values[first]
+        crc = np.full(len(rid1), -1)
+        crc[held] = [zlib.crc32(s1ids[s].encode()) % 10 for s in sid1[held]]
+        drop = held & ~np.isin(crc, folds)
+        unsure, ambig = unsure & ~drop, ambig & ~drop
+        print(f"held-out records outside crc folds {folds} not judged: {drop.sum():,}", flush=True)
     lg = lambda x: np.log(np.clip(x, 1e-6, 1 - 1e-6) / (1 - np.clip(x, 1e-6, 1 - 1e-6)))
     prio = -np.abs(lg(p1) - lg(THR)) + np.where(ambig, 2.0, 0.0)   # nearest the decision first, ambiguous records first
     sel = np.flatnonzero(unsure | ambig)
