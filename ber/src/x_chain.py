@@ -152,6 +152,18 @@ PLANS["v10b"] = [("v10b_fit", ["x_ce3.py", "train"], {**_B10, "CE_N": "3000000",
                  ("v10b_test", ["x_ce3.py", "score", "test"], _B10),
                  ("v10b_s1", ["x_stage_multi.py", "s1"], {**_STB, "S1K": "3"}),
                  ("v10b_s2p", ["x_nocopy.py", "test"], {**_STB, "BAG": "5", "PEERS": "1"})]
+# v12b = v10_fr3_llm (leaderboard 0.987071) + two more France vetoes: the v9fX stack (branch v9fS, plan v9mX:
+# cross-encoders self-trained on France in cross-fitted halves; copy its x/test_q_v9fXw.parquet here) and the LLM judge
+# on the rows v10_fr3_llm accepts at stage-2 q >= 0.99, which the blend never scores (x_llmhi.py; LLM=/base/model/dir).
+# One GPU here (SHARD 0/1); with two, run SHARD=0/2 and SHARD=1/2 of x_llmhi.py test side by side.
+_FR3 = "France:_v9spw:min,France:_v9s2pw:min,France:_v10s3pw:min"
+PLANS["v12b"] = [("v12b_seed", ["x_final.py", "-", "_v10plw"], {"FROM": _FR3, "SAVE_Q": "_v10fr3lw"}),
+                 ("v12b_rows", ["x_llmhi.py", "rows", "_v10plw", "_v10fr3lw", "_v10pw"], {}),
+                 ("v12b_llm_test", ["x_llmhi.py", "test"], {"SHARD": "0/1"}),
+                 ("v12b_llm_val", ["x_llmhi.py", "val"], {"SHARD": "0/1"}),
+                 ("v12b_check", ["x_llmhi.py", "check"], {}),
+                 ("v12b_final", ["x_final.py", f"{os.path.dirname(WORK)}/output_v12b", "_v10plw", "0.70"],
+                  {"FROM": _FR3 + ",France:_v9fXw:min", "LLMVETO": "0"})]
 ARGS = sys.argv[1:]
 PLAN = ARGS.pop(0) if ARGS and ARGS[0] in PLANS else "v5"   # python x_chain.py [plan] [first_step]
 STEPS = PLANS[PLAN]

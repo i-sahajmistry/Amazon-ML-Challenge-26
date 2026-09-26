@@ -4,6 +4,7 @@ x_nocopy.py test or x_thr.py): each record goes to its best S1 when q >= THR. On
   FROM=France:_v9sw[:min] THR_C=France:0.8 ...  # one country's q from another model (or the min of both) /
                                             # its own threshold
   NUMVETO=US,France MAXD=13 ...            # reject decoy groups at a shifted house number (see below)
+  LLMVETO=0 ...                             # reject rows whose LLM judge margin (x_llmhi.py) is below 0
   BLANK=<country> python x_final.py ...    # leaderboard probe: that country's S1s left empty, so the score
                                             # difference to the full file isolates that country
   python x_final.py sweep [TAG]             # per country: S1s with no match / matches per S1, by threshold"""
@@ -28,6 +29,15 @@ for spec in filter(None, os.environ.get("FROM", "").split(",")):   # "France:_v9
 if os.environ.get("SAVE_Q"):   # keep the combined q (e.g. the France veto) as x/test_q{SAVE_Q}, a self-training seed
     d.to_parquet(f"{WORK}/x/test_q{os.environ['SAVE_Q']}.parquet")
     sys.exit()
+if os.environ.get("LLMVETO"):
+    # the rows the stage-2 blend never sends to the LLM judge (countries without training labels, accepted at q >= 0.99;
+    # scored by x_llmhi.py): reject those whose margin logit(yes) - logit(no) is below LLMVETO (0: the judge says no)
+    from x_llmhi import scored
+    h = scored("test")
+    no = pd.MultiIndex.from_frame(h[h.llm.values < float(os.environ["LLMVETO"])][["rid", "sid"]])
+    k = pd.MultiIndex.from_arrays([d.rid.values, d.sid.values]).isin(no)
+    print("LLM veto:", pd.Series(d.c.values[k & (d.q.values >= THR)]).value_counts().to_dict(), "accepted records", flush=True)
+    d.loc[k, "q"] = 0.0
 s1 = load("test", 1); other = pd.concat([load("test", 2), load("test", 3)], ignore_index=True)
 if OUT == "sweep":
     n = s1.country.value_counts()

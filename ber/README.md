@@ -10,6 +10,10 @@ distractors are assigned to the fold of the S1 they imitate, so every training e
 (validation 0.99285 vs 0.99277 on the same records); self-training rounds 2 and 3 add two more France vetoes; and a
 LoRA-tuned LLM judge (Qwen3-Reranker-4B) is blended into the unsure records (+0.000994 on the leaderboard, five times
 its validation gain, so mostly France).
+**Branch `v12b`** (leaderboard pending): v10_fr3_llm with two more vetoes for the country without training labels, see
+[v12b](#v12b): the v9fX stack (cross-encoders self-trained on France in cross-fitted halves) and the LLM judge on the
+786k France rows v10_fr3_llm accepts at stage-2 q ≥ 0.99, which the blend never sends to it. US / India are unchanged;
+9,453 France matches are removed.
 
 **v9p_frand**: the v8 design (scalable HNSW blocking + calibrated shortlist, a lexicon learned per
 country, no hand-written tables) with a shortlist that also sees text similarities (7.4 candidate pairs per S1 on test,
@@ -152,6 +156,7 @@ Validation: entity folds 8–9, distractors at the test share of 39%, macro F0.5
 | v10s3p | self-training round 3 on v10, seeded by v10_fr2's France decisions | 0.99255 | – |
 | v10_fr3 | v10_fr2 + the round-3 France veto | 0.99285 | 0.986077 |
 | **v10_fr3_llm** | v10_fr3 with the LLM judge blended into v10's unsure records | **0.99282** (v10's own set, 0.99262 without) | **0.987071** |
+| v12b | v10_fr3_llm + the v9fX France veto + the LLM judge on France rows accepted at q ≥ 0.99 (rejected if it answers no) | 0.99282 (US / India = v10_fr3_llm) | pending |
 
 Validation scores are at threshold 0.70 from v9 on.
 
@@ -201,6 +206,40 @@ in folds 0–3 (the cross-encoders saw them), so a training / validation entity 
 - **bge-reranker-v2-m3 as a third cross-encoder** (`x_chain.py v10b`, in progress): Sarvesh's branch `bge-llm` measured
   +0.00016 on v9p's validation (0.99277 → 0.99293) with the model trained on the old folds; v10b trains it on v10's
   folds (`CE_TEXT=orig`: text as given, since the model reads case, accents and scripts itself).
+
+## v12b
+
+v10_fr3_llm with two more vetoes for the country without training labels. US / India are unchanged; France goes from
+838,865 to 829,412 accepted records (3.20 per S1; US and India 3.40).
+
+- **v9fX veto** (branch `v9fS`, `python x_chain.py v9mX`): both cross-encoders continued on France's confident decisions
+  of v9f (q ≥ 0.95 a match, ≤ 0.05 none) mixed 1:1 with train pairs, in two halves: each half of the France records is
+  re-scored by the model trained on the other half, so a record the seed accepted confidently can still be vetoed. Then
+  stages 1–2 run on the re-scored pairs → `x/test_q_v9fXw` (same candidate pairs, so the same rows). On top of
+  v10_fr3_llm's three vetoes it rejects **2,731** more France records; the ones sampled are descriptor swaps
+  ("Entre Club EURL" for the S1 "Entre Comite EURL", "SARL Peche Amicale" for "Peche Club SARL").
+- **LLM judge on the rows it never saw** (`x_llmhi.py`): the blend only scores rows with 0.01 < q < 0.99, and 785,586
+  of v10_fr3_llm's 838,865 France matches (94%) sit at q ≥ 0.99. That band is safe for a country with training labels
+  (US / India validation rows at q ≥ 0.99 are 99.99% true matches), but France's q is not calibrated. The judge scores
+  those rows (~50 min on two A100s, ~135 pairs/s each) and a row is rejected when the judge answers no (margin < 0; the
+  cut is the judge's own, not tuned on the leaderboard):
+
+  | Rows at stage-2 q ≥ 0.99 | Rows | Margin < −2 | < −1 | < 0 |
+  |---|---|---|---|---|
+  | US / India validation, true matches | 40,000 (sampled) | 0.04% | 0.06% | 0.12% |
+  | US / India validation, not true | 160 (all) | 5.6% | 5.6% | 10.6% |
+  | France test, accepted by v10_fr3_llm | 785,586 | 0.48% (3,731) | 0.69% (5,408) | **0.92% (7,205)** |
+
+  France gets a "no" 7.6 times as often as US / India true matches: if French true matches looked like US / India ones
+  to the judge, at most 13% of the 7,205 would be true matches. Reading samples, 25 of 25 below −2, about 23 of 25 in
+  [−2, −1) and about 18 of 25 in [−1, 0) are decoys, mostly a swapped descriptor ("Organisme Lycee SARL" for the S1
+  "Organisme Union SARL", "KXU Ecole SA" for "KXU Club SA", "Développement Pont SARL" for "Pont Union SARL"); the true
+  matches among them are acronyms ("CP" for "CB Parents SAS") and reordered names. 6,722 of the 7,205 are still accepted
+  after the v9fX veto.
+
+Expected leaderboard: each France record a veto removed was worth +8.7e-8 in round 1 (23,559 records, +0.002052) and
++2.2e-8 in round 3 (6,095 records, +0.000135), so v12b's 9,453 records should add +0.0002 to +0.0008, i.e. about
+**0.9873–0.9879**.
 
 ## Leaderboard
 
@@ -291,6 +330,19 @@ python x_llmstack.py _v9p _v10p      # blend into v10's unsure records -> work/x
 FROM=France:_v9spw:min,France:_v9s2pw:min python x_final.py ../output_v10_fr2_llm _v10plw 0.70
 python x_chain.py v10s3              # self-training round 3, seeded by v10_fr2 -> work/x/test_q_v10s3pw.parquet
 FROM=France:_v9spw:min,France:_v9s2pw:min,France:_v10s3pw:min python x_final.py ../output_v10_fr3_llm _v10plw 0.70
+```
+Then v12b (branch `v12b`; `LLM=` the Qwen3-Reranker-4B directory, the LoRA adapter is `work/x/llm_lora`):
+```bash
+# the v9fX stack comes from branch v9fS (python x_chain.py v9m, then v9mX): copy its work/x/test_q_v9fXw.parquet here
+python x_chain.py v12b               # v10_fr3_llm's France decisions, the rows at q >= 0.99, LLM judge (one GPU),
+                                     # check, decision -> ../output_v12b
+# the same with two GPUs:
+FROM=France:_v9spw:min,France:_v9s2pw:min,France:_v10s3pw:min SAVE_Q=_v10fr3lw python x_final.py - _v10plw 0.70
+python x_llmhi.py rows _v10plw _v10fr3lw _v10pw
+SHARD=0/2 CUDA_VISIBLE_DEVICES=0 python x_llmhi.py test & SHARD=1/2 CUDA_VISIBLE_DEVICES=1 python x_llmhi.py test; wait
+python x_llmhi.py val && python x_llmhi.py check
+FROM=France:_v9spw:min,France:_v9s2pw:min,France:_v10s3pw:min,France:_v9fXw:min LLMVETO=0 \
+  python x_final.py ../output_v12b _v10plw 0.70
 ```
 `x_chain.py` runs each step in order and logs it to `work/logs/<step>.log`; the plans list the exact commands and
 environment (`python x_chain.py <plan> <first_step>` resumes). `python x_final.py ../output_v9p _v9pw 0.70` writes
