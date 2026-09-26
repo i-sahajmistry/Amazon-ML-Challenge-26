@@ -3,6 +3,17 @@
 Newest first. Each entry: what was measured, the number, what it means. LB = public leaderboard; "val" = US/India
 validation (entity folds 8-9, distractors weighted to the test share of 39%, copy-free).
 
+## 2026-09-27 02:00 — LB: v10_fr3_llm_dd = 0.990282 (+0.003211), new best; pushed as v11 432da9e
+- The expected value was 0.99024 at 95% right, so the fixes are ~95-96% right. The census / hand review holds:
+  groupe / développement at the same address are true-match suffixes. The LLM judge's "no" on them (x_frllm) was a
+  US word prior. Its confirmation of the type-word rejects stands. The hedge `suf7ngtrej` is not needed.
+- **Next candidate `submissions/v10b_fr3_llm2_dd`** (md5 bd3c8abc, PASS): v10b + LLM (full coverage) + the three
+  France vetoes + the same dd restore / reject. restore_fr_dd: 32,222 of its pairs present in v10b's q; reject_fr_dd
+  11,634 (8,502 accepted before). Accepted US 2,255,859 / India 2,751,539 / France 856,613. Against dd it adds 6,005,
+  removes 10,939, and changes 16,415 S1 rows. Val +0.00011 (US / India); France effect of bge unknown.
+- Code, README (results row + reproduce steps) and this log are pushed on v11 (432da9e). rule1's candidate list
+  (x_census.R1) still comes from the structure clone (rule_fr.py, scratch/rule1ex.py).
+
 ## 2026-09-27 01:30 — the LLM judge as an independent check of suf7 / trej; hedge file; what v12b (GitHub) offers
 `x_frllm.py` reads the LLM margins computed at ~23:00 for every unsure row (0.01 < q < 0.99), before the hand review
 existed, so they are an independent label-free signal. Calibration on US / India validation band rows: P(no | true)
@@ -361,8 +372,6 @@ Top 5 were all above 0.990 on 2026-09-26 night.
 - Qwen2.5-7B zero-shot judge (Sarvesh): AUC 0.59 on unsure pairs, no gain. Our LoRA-tuned Qwen3-Reranker-4B: AUC 0.844,
   +0.0002 val, +0.001 LB.
 
-## Running (2026-09-27 01:45)
-- **Uploading: `submissions/v10_fr3_llm_dd`** (matching md5 75f68b10, candidate 1a8b4f5c, validator PASS; the user
-  submits it). Expected ≈ 0.9902 if the hand review / census are right, ≈ 0.9881 if groupe / développement are decoys.
-  A result near 0.988 means the next upload should be a groupe/dev-free hedge (`suf7ngtrej`, 7a4b5947, or a dd version).
-- Also ready: `v10_fr3_llm_suf7ngtrej` (7a4b5947), `v10b_fr3_llm2` (6e1dca1a), `v10_fr3_llmfr` (eb3784dd).
+## Running (2026-09-27 02:00)
+- Best: `v10_fr3_llm_dd` 0.990282. Ready: `v10b_fr3_llm2_dd` (bd3c8abc). Superseded: suf7ngtrej, v10b_fr3_llm(2),
+  v10_fr3_llm_r1.
