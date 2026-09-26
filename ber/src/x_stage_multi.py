@@ -53,8 +53,14 @@ def ce_feats(keys, ce, t=""):
                          f"ce{t}_s1_npos": npos}, dtype=np.float32)
 
 
+# CE_TEST_SUFFIX=st: test pairs use the cross-encoder scores re-computed by x_ce_st.py (cross-encoders self-trained on
+# the test countries without training labels); train pairs keep the original scores the stage models learn from
+CE_TEST_SUFFIX = os.environ.get("CE_TEST_SUFFIX", "")
+
+
 def all_ce(keys, split):
-    return pd.concat([ce_feats(keys, np.load(f"{XD}/ce{t}_{split}.npy"), t) for t in CE_TAGS], axis=1)
+    sfx = CE_TEST_SUFFIX if split == "test" else ""
+    return pd.concat([ce_feats(keys, np.load(f"{XD}/ce{t}{sfx}_{split}.npy"), t) for t in CE_TAGS], axis=1)
 
 
 def stage1_data(split):

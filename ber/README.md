@@ -37,6 +37,16 @@ describes the base pipeline; the "v9fS" section lists what differs.
      country is dissimilar (US hidden), no change when it is close (India hidden).
 5. **Decision judge** (`x_judge.py`, optional): LightGBM, XGBoost (Apache-2.0) or their average, fitted on the same
    stage-2 rows. On v9fS they are within noise (0.99258 / 0.99254 / 0.99259).
+6. **v9fX: cross-encoders self-trained too** (`x_ce_st.py`, plan `v9mX`, `CE_TEST_SUFFIX=st`).
+   - Pseudo-labels come from the stage-2 predictions without stage-1 self-training (v9f), for the test countries
+     with no training labels:
+     - the argmax pair of a record with q >= 0.95 is a match, and its other candidates are negatives;
+     - records with q <= 0.05 match nothing.
+   - Each cross-encoder is fine-tuned for one epoch on one half of those records, mixed 1:1 with its own labelled
+     training pairs, and then re-scores the other half. Stages 1-2 run again on the re-scored test pairs.
+   - On France: uncertain records (0.3 < q < 0.9) drop from 5.25% to 3.15%, and the chosen S1 changes for 4.5% of
+     records. Accepts go 871k -> 867k (3.34 per S1; US 3.41, India 3.40).
+   - US and India are untouched. Only the leaderboard shows the France effect.
 
 ## Algorithm (v8, the base of v9fS)
 
@@ -146,6 +156,7 @@ Validation: entity folds 8–9, distractors at the test share of 39%, macro F0.5
 | v9p | v9 + "peers" stage-2 features (Sahaj; code not yet in git) | 0.99279 copy-free | – |
 | **v9fS** | v9 + distractor-word features + per-model stage 2 + self-training for countries without labels | **0.99257 copy-free** (France change not measurable) | pending |
 | v9fJ | v9fS without self-training, LightGBM + XGBoost judge at 0.66 | 0.99259 copy-free | – |
+| v9fX | v9fS without stage-1 self-training, with both cross-encoders self-trained on France pseudo-pairs | 0.99257 copy-free (France changes not measurable) | pending |
 
 Tried without gain: word-edit log-likelihood features (`x_llr.py`, 0.99274 vs 0.99273), re-ranking each record's top
 2 (`x_top2.py`, 0.99278 either way), an expected-F0.5 decision per S1 instead of a threshold (v3: 0.9775 vs 0.9788).
@@ -218,6 +229,11 @@ TAG=_v9fS python x_final.py ../output_v9fS _v9fSw 0.70
 ```
 Optional judge: `TAG=... python x_judge.py && JUDGE=best TAG=... python x_judge.py test`, then
 `python x_final.py OUT _TAGJ auto`.
+
+v9fX (after v9m's features and cross-encoders exist): `python x_chain.py v9mX`. It runs:
+1. stages 1-2 without self-training;
+2. `x_ce_st.py` for both cross-encoders (about 40 min on one A100);
+3. stages 1-2 with `CE_TEST_SUFFIX=st`, writing `../output_v9fX`.
 
 ### Run v8 (from `src/`; one A100 80GB, ~32 cores, ~200 GB RAM; about 8 h end to end)
 ```bash

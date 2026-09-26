@@ -89,6 +89,19 @@ PLANS["v9m"] = PLANS["v8a"] + [
     ("v9m_judge", ["x_judge.py"], _S9),
     ("v9m_judge_test", ["x_judge.py", "test"], {**_S9, "JUDGE": "best"}),
     ("v9m_final_judge", ["x_final.py", f"{_OUT9}/output_v9mSJ", "_v9mJ", "auto"], _S9)]
+# v9mX = v9fX, after v9m's features and cross-encoders exist: stages without stage-1 self-training (v9f), then both
+# cross-encoders self-trained on that run's confident predictions for the test countries without training labels
+# (x_ce_st.py), then stages 1-2 again with the re-scored test pairs (CE_TEST_SUFFIX=st) -> ../output_v9fX
+_F9 = {"TAG": "_v9f", "CE_TAGS": ",_raw", "WORDS": "1", "S1K": "3"}
+_X9 = {**_F9, "TAG": "_v9fX", "CE_TEST_SUFFIX": "st"}
+PLANS["v9mX"] = [
+    ("v9f_s1", ["x_stage_multi.py", "s1"], _F9),
+    ("v9f_s2", ["x_nocopy.py", "test"], _F9),
+    ("v9fX_ce_st", ["x_ce_st.py"], {"TAG": "_v9f", "CE_TEXT": "norm", "CE_DIR": f"{WORK}/x/ce", "CE_TAG": ""}),
+    ("v9fX_ce_raw_st", ["x_ce_st.py"], {"TAG": "_v9f", "CE_TEXT": "raw", "CE_DIR": f"{WORK}/x/ce_raw", "CE_TAG": "_raw"}),
+    ("v9fX_s1", ["x_stage_multi.py", "s1"], _X9),
+    ("v9fX_s2", ["x_nocopy.py", "test"], _X9),
+    ("v9fX_final", ["x_final.py", f"{os.path.dirname(WORK)}/output_v9fX", "_v9fXw", "0.70"], _X9)]
 ARGS = sys.argv[1:]
 PLAN = ARGS.pop(0) if ARGS and ARGS[0] in PLANS else "v5"   # python x_chain.py [plan] [first_step]
 STEPS = PLANS[PLAN]

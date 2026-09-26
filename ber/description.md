@@ -65,6 +65,37 @@ Rules that changed on 2026-09-26 (organiser answers):
 5. **Decision judge** (`x_judge.py`, optional). On the same rows, LightGBM, XGBoost and their average score
    0.99258, 0.99254 and 0.99259. These are within noise, so v9fS keeps LightGBM.
 
+## v9fX: cross-encoders self-trained on France
+
+Stage-1 self-training (v9fS) only re-weights existing features. The cross-encoders are the text models, and they
+learned to read names and addresses from US / India pairs only. v9fX adapts them to the unlabelled country.
+
+1. **Pseudo-labels** come from v9f's stage-2 test scores (no stage-1 self-training), for the 1.42M France records.
+   - 828k records with q >= 0.95: the argmax pair is a match, and the record's other shortlisted pairs are hard
+     negatives.
+   - 450k records with q <= 0.05: none of their pairs match.
+   - This gives 1.91M labelled pairs, 43% positive.
+2. **Fine-tuning** (`x_ce_st.py`):
+   - Each cross-encoder (normalised and raw text) continues from its trained weights for one epoch, at LR 2e-5.
+   - It trains on one half of those records plus the same number of its own labelled training pairs (retrieved
+     top-5 of S1 folds 0-3), so it keeps US / India.
+   - It then re-scores the other half. Two halves per cross-encoder, about 10 minutes each on one A100.
+3. **Stages 1-2 are re-run** with the re-scored test pairs (`CE_TEST_SUFFIX=st`). Train pairs, and therefore the
+   stage models' training data, are unchanged.
+
+What changed on France (US / India are unchanged, validation still 0.99257):
+
+| France | v9f | v9fX |
+|---|---:|---:|
+| accepted at 0.70 | 871,196 | 867,161 (3.34 per S1) |
+| confident match (q >= 0.95) | 58.1% | 59.0% |
+| confident no-match (q <= 0.05) | 31.6% | 35.0% |
+| uncertain (0.3 < q < 0.9) | 5.25% | 3.15% |
+| same argmax S1 as v9f | – | 95.5% |
+| accepted by only one of the two | – | 18.5k v9f-only, 14.5k v9fX-only |
+
+v9fX is the variant most likely to move France, up or down. Compare its leaderboard score with v9f's.
+
 ## Candidate-set size
 
 Every row of the merged model's validation filtered by the shortlist probability, as a stricter shortlist would
@@ -89,6 +120,7 @@ Every row of the merged model's validation filtered by the shortlist probability
 | v9f (v9fS without self-training) | 5,884,325 | 2,752,808 | 2,260,321 | 871,196 | 101,362 |
 | v9fJ (judge average, 0.66) | 5,893,612 | 2,754,935 | 2,263,605 | 875,072 | – |
 | **v9fS** | 5,889,020 | 2,752,808 | 2,260,321 | **875,891** | – |
+| v9fX | 5,880,290 | 2,752,808 | 2,260,321 | 867,161 | – |
 
 Matches per S1 are 3.38-3.40 in every country; the train truth is 3.46. France is not over-accepted: 3.38 per S1
 against 3.40 for US / India.
@@ -101,24 +133,28 @@ against 3.40 for US / India.
 ## Still open
 
 - **v9p "peers" features** (Sahaj, 0.99279 on validation): merge once the code is pushed.
-- **v9fX**, cross-encoder self-training on France pseudo-pairs (`x_ce_st.py`): in progress.
-- **`bge-reranker-v2-m3`** (Apache-2.0, 568M, multilingual) as a third cross-encoder: in progress. Estimated +0.001
-  to +0.003, mostly France.
+- **Leaderboard comparison:** submit v9f, v9fS and v9fX. They differ only on France, so the score differences are
+  the France effects of the two kinds of self-training. Then combine the ones that help.
+- **`bge-reranker-v2-m3`** (Apache-2.0, 568M, multilingual) as a third cross-encoder: parked.
+  - After 500k training pairs, its fold-9 argmax accuracy is 0.98173, against 0.98169 / 0.98227 for the e5
+    normalised / raw cross-encoders (`analysis/v9/g10_ce_compare.py`).
+  - So it is no better on US / India, and its France value could only be measured by a leaderboard run.
 - **Final package:** one clean `python x_chain.py v9m` run from this branch.
 
 ## Files
 
 - **New:**
-  - `src/words.py`, `src/x_judge.py`, `src/x_ce_st.py` (v9fX, experimental).
-  - `analysis/v9/g7_selftrain_loco.py`, `g8_shortlist_combo.py`, `g9_text_tau.py`.
+  - `src/words.py`, `src/x_judge.py`, `src/x_ce_st.py` (v9fX).
+  - `analysis/v9/g7_selftrain_loco.py`, `g8_shortlist_combo.py`, `g9_text_tau.py`, `g10_ce_compare.py`,
+    `g11_report.py`.
 - **Changed:**
   - `match.py`: `text_feats`, `SHORTLIST=text:tau`.
   - `shortlist.py`: fits the retrieval and text models.
   - `stage2.py`: `record_inputs`, `score_per_model`.
-  - `x_stage_multi.py`: word features, `pm*` columns, `self_train`.
+  - `x_stage_multi.py`: word features, `pm*` columns, `self_train`, `CE_TEST_SUFFIX`.
   - `x_nocopy.py`: per-model test scoring.
   - `x_final.py`: `THR=auto`.
-  - `x_chain.py`: plan `v9m` (= v9fS).
+  - `x_chain.py`: plans `v9m` (= v9fS) and `v9mX` (= v9fX).
   - `x_ce.py` / `x_ce3.py`: the fold-9 check is optional, so cross-encoders can train before the features exist.
   - `retrieve.py`: FAISS threads from `NT`.
   - `common.py`: fork start method for Python 3.14.
