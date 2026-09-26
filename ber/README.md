@@ -218,6 +218,22 @@ FROM=France:_v9spw:min,France:_v9s2pw:min,France:_v10s3pw:min RESTORE=restore_fr
 The restore candidates are rule1's additions (`x_census.R1`: strict same number / street / first + rarest name word),
 built by `rule_fr.py` and `scratch/rule1ex.py` on branch `structure` (not yet in this branch).
 
+**Built directly (branch `dd-generic`):** `python x_chain.py dd` makes the same file with no hand-written words, no
+country names and no files from other folders (matching_results md5 75f68b10…, byte for byte):
+- `dd_seed`: the three self-training vetoes for the countries without training labels (`FROM=unlabelled:…`;
+  `common.unlabelled()` finds them from the data, France here) → `x/test_q_v10fr3l`;
+- `dd_rule`: `rule_fr.py`, structural same-address candidates (same house number and second number, the S1's
+  distinctive street words, its first and rarest core-name word, no decoy word by the house-number statistic;
+  > 99% true on US / India validation);
+- `dd_lists`: `x_ddfix.py` (positions → nD census → per-word TV → `x/restore_dd`, `x/reject_dd`);
+- `dd_final`: `x_final.py … RESTORE=restore_dd REJECT=reject_dd`.
+
+`python x_ddfix.py check` applies the same fixes to US / India validation. India: restore 638 rows (4% true, −0.0016),
+reject 2,922 (99.97% true, −0.0024). US: restore 179 (24% true, −0.0002). Where labels exist the models are already
+right, so the fixes are applied only to the countries without labels. `x_wordsame.py`, `x_families.py`, `x_frfix.py`
+and `x_suf7ng.py` are the hand-review analysis; the `dd` plan does not use them. `rule_fr.py` reads
+`x/wstat_words_test_<country>_0.parquet` (the house-number word statistic, `wstat.py`, not yet in this branch).
+
 ## Leaderboard
 
 | File | Score |

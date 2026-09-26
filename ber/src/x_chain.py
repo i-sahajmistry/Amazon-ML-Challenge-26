@@ -104,7 +104,7 @@ _RS2 = {"CE_TEXT": "raw", "CE_DIR": f"{WORK}/x/ce_rs2", "CE_TAG": "_rs2"}
 _NS2 = {"CE_DIR": f"{WORK}/x/ce_ns2", "CE_TAG": "_ns2"}
 _SELF2 = {**_SELF, "SELF": f"{WORK}/x/test_q_v9pfr.parquet"}
 _ST2 = {"CE_TAGS": "_ns2,_rs2", "TAG": "_v9s2"}
-PLANS["v9s2"] = [("v9s2_seed", ["x_final.py", "-", "_v9pw"], {"FROM": "France:_v9spw:min", "SAVE_Q": "_v9pfr"}),
+PLANS["v9s2"] = [("v9s2_seed", ["x_final.py", "-", "_v9pw"], {"FROM": "unlabelled:_v9spw:min", "SAVE_Q": "_v9pfr"}),
                  ("v9s2_rs_fit", ["x_ce3.py", "train"], {**_RS2, "CE_INIT": f"{WORK}/x/ce_raw", **_SELF2}),
                  ("v9s2_ns_fit", ["x_ce3.py", "train"], {**_NS2, "CE_INIT": f"{WORK}/x/ce", **_SELF2}),
                  ("v9s2_rs_train", ["x_ce3.py", "score", "train"], _RS2),
@@ -133,7 +133,7 @@ _RS3 = {**_D, "CE_TEXT": "raw", "CE_DIR": f"{WORK}/x/ce_rs3", "CE_TAG": "_rs3"}
 _NS3 = {**_D, "CE_DIR": f"{WORK}/x/ce_ns3", "CE_TAG": "_ns3"}
 _SELF3 = {**_SELF, "SELF": f"{WORK}/x/test_q_v10fr.parquet"}
 _ST3 = {**_D, "CE_TAGS": "_ns3,_rs3", "TAG": "_v10s3"}
-PLANS["v10s3"] = [("v10s3_seed", ["x_final.py", "-", "_v10pw"], {"FROM": "France:_v9spw:min,France:_v9s2pw:min", "SAVE_Q": "_v10fr"}),
+PLANS["v10s3"] = [("v10s3_seed", ["x_final.py", "-", "_v10pw"], {"FROM": "unlabelled:_v9spw:min,unlabelled:_v9s2pw:min", "SAVE_Q": "_v10fr"}),
                   ("v10s3_rs_fit", ["x_ce3.py", "train"], {**_RS3, "CE_INIT": f"{WORK}/x/ce_r10", **_SELF3}),
                   ("v10s3_ns_fit", ["x_ce3.py", "train"], {**_NS3, "CE_INIT": f"{WORK}/x/ce_n10", **_SELF3}),
                   ("v10s3_rs_train", ["x_ce3.py", "score", "train"], _RS3),
@@ -152,23 +152,32 @@ PLANS["v10b"] = [("v10b_fit", ["x_ce3.py", "train"], {**_B10, "CE_N": "3000000",
                  ("v10b_test", ["x_ce3.py", "score", "test"], _B10),
                  ("v10b_s1", ["x_stage_multi.py", "s1"], {**_STB, "S1K": "3"}),
                  ("v10b_s2p", ["x_nocopy.py", "test"], {**_STB, "BAG": "5", "PEERS": "1"})]
+# the three self-training vetoes of v10_fr3_llm, for the countries without training labels (common.unlabelled)
+_VETO3 = "unlabelled:_v9spw:min,unlabelled:_v9s2pw:min,unlabelled:_v10s3pw:min"
 # llm2 = the LLM judge on every unsure v10 row (llm_{val,test}_v10p), and a copy continued on France's confident
 # decisions of v10_fr3_llm (x/llm_lora_fr): France's unsure rows re-scored by it (llm_{val,test}_v10p_fr)
 _FR = {"LLM_DIR": f"{WORK}/x/llm_lora_fr", "LLM_TAG": "_fr"}
-PLANS["llm2"] = [("llm2_seed", ["x_final.py", "-", "_v10plw"], {"FROM": "France:_v9spw:min,France:_v9s2pw:min,France:_v10s3pw:min",
+PLANS["llm2"] = [("llm2_seed", ["x_final.py", "-", "_v10plw"], {"FROM": _VETO3,
                                                                "SAVE_Q": "_v10fr3l"}),
                  ("llm2_extend", ["x_llm.py", "extend"], {"QT": "_v9p", "QB": "_v10p"}),
                  ("llm2_fr_train", ["x_llm.py", "train"], {**_FR, "QT": "_v9p", "LLM_N": "30000", "SELF_N": "50000",
                                                            "SELF": f"{WORK}/x/test_q_v10fr3l.parquet",
                                                            "LLM_INIT": f"{WORK}/x/llm_lora", "LLM_LR": "5e-5"}),
                  ("llm2_fr_val", ["x_llm.py", "val"], {**_FR, "QT": "_v10p"}),
-                 ("llm2_fr_test", ["x_llm.py", "test"], {**_FR, "QT": "_v10p", "COUNTRY": "France"})]
+                 ("llm2_fr_test", ["x_llm.py", "test"], {**_FR, "QT": "_v10p", "COUNTRY": "unlabelled"})]
 # v10n = v10 + signed house-number shift features (x_feats int_first_shift / int_near_shift): extra features
 # recomputed, stages rebuilt with the v10 CEs -> x/test_q_v10npw
 _STN = {**_D, "CE_TAGS": "_n10,_r10", "TAG": "_v10n"}
 PLANS["v10n"] = [("v10n_extra", ["-c", "import x_feats; x_feats.main('train'); x_feats.main('test')"], {}),
                  ("v10n_s1", ["x_stage_multi.py", "s1"], {**_STN, "S1K": "3"}),
                  ("v10n_s2p", ["x_nocopy.py", "test"], {**_STN, "BAG": "5", "PEERS": "1"})]
+# dd = v10_fr3_llm + same-address fixes for the countries without training labels, built directly from label-free
+# statistics of their own records (x_ddfix.py; structural candidates from rule_fr.py): leaderboard 0.990282
+PLANS["dd"] = [("dd_seed", ["x_final.py", "-", "_v10plw"], {"FROM": _VETO3, "SAVE_Q": "_v10fr3l"}),
+               ("dd_rule", ["rule_fr.py", "_v10plw"], {}),
+               ("dd_lists", ["x_ddfix.py", "_v10plw", "_v10fr3l"], {}),
+               ("dd_final", ["x_final.py", f"{os.path.dirname(WORK)}/output_v10_fr3_llm_dd", "_v10plw", "0.70"],
+                {"FROM": _VETO3, "RESTORE": "restore_dd", "REJECT": "reject_dd"})]
 ARGS = sys.argv[1:]
 PLAN = ARGS.pop(0) if ARGS and ARGS[0] in PLANS else "v5"   # python x_chain.py [plan] [first_step]
 STEPS = PLANS[PLAN]

@@ -21,6 +21,20 @@ def load(split, src):
     return df
 
 
+def unlabelled():
+    """test countries without a single labelled training record (France here), found from the data, so no country is
+    named in the pipeline: FROM= / THR_C= (x_final.py), COUNTRY= (x_llm.py) and rule_fr.py take 'unlabelled' for them"""
+    return sorted(set(load("test", 1).country.unique()) - set(load("train", 1).country.unique()))
+
+
+def countries(spec):
+    """a comma-separated country list in which 'unlabelled' stands for unlabelled()"""
+    out = []
+    for c in filter(None, spec.split(",")):
+        out += unlabelled() if c == "unlabelled" else [c]
+    return out
+
+
 def s1_fold(ids):
     """Deterministic split of train S1 ids: 0..9 by crc32. Folds 0-3 -> embedder, 4-8 -> GBM, 9 -> validation."""
     return np.array([zlib.crc32(x.encode()) % 10 for x in ids], dtype=np.int8)
