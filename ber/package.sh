@@ -7,7 +7,7 @@ S=$R/submission/stage; rm -rf $S; mkdir -p $S/output $S/code/business_entity_res
 cp $R/output/matching_results.tsv $R/output/candidate_pairs.tsv $S/output/
 cp -r $R/ber/src $R/ber/README.md $S/code/business_entity_resolution/
 rm -rf $S/code/business_entity_resolution/src/__pycache__
-$HOME/scratch/miniconda3/envs/amlc/bin/pip freeze | grep -iE "^(torch|numpy|numba|llvmlite|faiss-cpu|pandas|pyarrow|lightgbm|rapidfuzz|anyascii|sentence-transformers|transformers|datasets|accelerate)==" \
+$HOME/scratch/miniconda3/envs/amlc/bin/pip freeze | grep -iE "^(torch|numpy|numba|llvmlite|faiss-cpu|pandas|pyarrow|lightgbm|rapidfuzz|anyascii|sentence-transformers|transformers|datasets|accelerate|peft|scikit-learn)==" \
   > $S/code/business_entity_resolution/requirements.txt
 cp $R/ber/Documentation_template.md $S/ 2>/dev/null || cp $R/student_resource/Documentation_template.md $S/
 cd $R/student_resource && python3 utils/validate_submission.py --matching $S/output/matching_results.tsv \
