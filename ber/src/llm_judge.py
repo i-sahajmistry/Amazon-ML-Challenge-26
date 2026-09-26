@@ -65,7 +65,7 @@ def select(split):
         # evaluation group loco_eval.py reports separately, to save GPU time
         import zlib
         from common import HELD
-        folds = [int(x) for x in os.environ["LLM_HELD_FOLDS"].split(",")]
+        folds = [int(x) for x in os.environ["LLM_HELD_FOLDS"].replace(",", ":").split(":") if x]   # "8:9"
         held = rf[rid1] == HELD
         s1ids = load("train", 1).entity_id.values
         sid1 = k.sid.values[first]

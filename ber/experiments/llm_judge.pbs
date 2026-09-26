@@ -11,7 +11,7 @@
 # Logs: $RUNDIR/work/logs/llm_*.log
 # Submit:  qsub ~/scratch/ber_llm/ber/experiments/llm_judge.pbs
 #          qsub -v GATE_ONLY=1 ...                          (only the gate: prompts, scores, AUC; no files)
-#          qsub -v RUNDIR=$HOME/scratch/amlc_loco_india,HOLDOUT=India,SPLITS=train,LLM_HELD_FOLDS=8,9,LOCO_EVAL=1 ...
+#          qsub -v RUNDIR=$HOME/scratch/amlc_loco_india,HOLDOUT=India,SPLITS=train,LLM_HELD_FOLDS=8:9,LOCO_EVAL=1 ...
 #              (the held-out-India test: judge US rows + India's folds 8-9, then score India with LLM features;
 #               compare 'India, never trained on (crc folds 8-9)' with 0.90727 without the LLM)
 PY=${PY:-$HOME/scratch/miniconda3/envs/amlc312/bin/python}
