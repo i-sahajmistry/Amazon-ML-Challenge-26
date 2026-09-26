@@ -83,6 +83,16 @@ def _clean(x):
     return " ".join(str(x).split())[:160] or "(empty)"
 
 
+def _auc(score, y):
+    """probability that a random true pair scores above a random other pair (ties count half)."""
+    from scipy.stats import rankdata
+    y = np.asarray(y, bool)
+    pos, neg = y.sum(), (~y).sum()
+    if pos == 0 or neg == 0:
+        return float("nan")
+    return float((rankdata(score)[y].sum() - pos * (pos + 1) / 2) / (pos * neg))
+
+
 def score(split):
     import torch
     from transformers import AutoModelForCausalLM, AutoTokenizer
@@ -93,8 +103,8 @@ def score(split):
         print("exists, skip", out_f, flush=True)
         return
     pairs = pd.read_parquet(f"{XD}/llm_pairs_{split}.parquet").iloc[shard::nshard].reset_index(drop=True)
-    if smoke:
-        pairs = pairs.iloc[:smoke]
+    if smoke:   # a random sample, so every country and both sources appear
+        pairs = pairs.sample(n=min(smoke, len(pairs)), random_state=0).reset_index(drop=True)
     s1, o = load(split, 1), others(split)
     n1, a1, c1 = s1.business_name.values, s1.business_address.values, s1.country.values
     n2, a2 = o.business_name.values, o.business_address.values
@@ -146,6 +156,15 @@ def score(split):
     if smoke:
         for t, v in list(zip(texts, out))[:8]:
             print(f"--- log-odds(Yes) {v:+.2f}\n{t[-420:]}", flush=True)
+        if split == "train":   # gate: on labelled pairs the judge must separate true pairs from the rest
+            from harness import truth_arrays
+            y = truth_arrays()[2][pairs.rid.values] == pairs.sid.values
+            auc = _auc(out, y)
+            gate = float(os.environ.get("LLM_GATE_AUC", 0.75))
+            print(f"smoke check: judge AUC {auc:.4f} on {len(y):,} labelled pairs ({y.mean():.1%} true); gate {gate}",
+                  flush=True)
+            if not auc >= gate:
+                sys.exit(3)
         return
     pairs.assign(llm=out).to_parquet(out_f)
     print("wrote", out_f, flush=True)
@@ -160,16 +179,13 @@ def merge(split):
     print(f"merged {len(parts)} shards: {len(L):,} pairs -> {XD}/llm_{split}.parquet", flush=True)
     if split == "train":   # how well does the judge separate true pairs from the rest, per country (labels: train only)
         from harness import truth_arrays
-        from scipy.stats import rankdata
         ts = truth_arrays()[2]
         y = ts[L.rid.values] == L.sid.values
         c = others("train").country.values[L.rid.values]
         for g in sorted(set(c)):
             m = c == g
-            r = rankdata(L.llm.values[m])
-            pos = y[m].sum()
-            auc = (r[y[m]].sum() - pos * (pos + 1) / 2) / max(pos * (m.sum() - pos), 1)
-            print(f"  judge AUC on {g} judged pairs: {auc:.4f}  ({m.sum():,} pairs, {y[m].mean():.2%} true)", flush=True)
+            print(f"  judge AUC on {g} judged pairs: {_auc(L.llm.values[m], y[m]):.4f}  ({m.sum():,} pairs, "
+                  f"{y[m].mean():.2%} true)", flush=True)
 
 
 if __name__ == "__main__":

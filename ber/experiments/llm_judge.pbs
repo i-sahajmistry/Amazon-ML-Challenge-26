@@ -5,13 +5,15 @@
 #PBS -l select=1:ncpus=8:ngpus=4:mem=200gb
 #PBS -l walltime=06:00:00
 # LLM judge scores for a finished run: select the uncertain / ambiguous records, score their best candidates with a local
-# open-weight LLM (one process per GPU PBS gave the job), merge. Test first (the submission needs it), then train
-# (stage 2 learns the feature there; merge prints the judge's AUC per country). Logs: $RUNDIR/work/logs/llm_*.log
+# open-weight LLM (one process per GPU PBS gave the job), merge. A gate runs first: 2,000 random labelled train pairs
+# must reach judge AUC >= LLM_GATE_AUC (0.75), else the job stops before the long scoring. Then test (the submission
+# needs it), then train (stage 2 learns the feature there; merge prints the judge's AUC per country).
+# Logs: $RUNDIR/work/logs/llm_*.log
 # Submit:  qsub ~/scratch/ber_llm/ber/experiments/llm_judge.pbs
-#          qsub -v SMOKE=200 ...                           (quick check: 200 pairs, prints prompts and scores, no files)
+#          qsub -v GATE_ONLY=1 ...                          (only the gate: prompts, scores, AUC; no files)
 #          qsub -v RUNDIR=$HOME/scratch/amlc_loco_india,HOLDOUT=India,SPLITS=train ...   (the held-out-India run)
 PY=${PY:-$HOME/scratch/miniconda3/envs/amlc312/bin/python}
-set -ex
+set -ex -o pipefail
 export AMLC_ROOT=${RUNDIR:-$HOME/scratch/amlc_v8} TAG=${TAG:-_v8} SEL=${SEL:-v4} HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1
 export LLM_MODEL=${LLM_MODEL:-/scratch/scai/mtech/aib262045/models/Qwen3-8B}
 [ -n "${HOLDOUT:-}" ] && export HOLDOUT
@@ -22,13 +24,16 @@ cd "${CODE:-$HOME/scratch/ber_llm}/ber/src"
 if [ -n "${CUDA_VISIBLE_DEVICES:-}" ]; then G=(${CUDA_VISIBLE_DEVICES//,/ }); else G=(""); fi
 N=${#G[@]}
 echo "GPUs: ${CUDA_VISIBLE_DEVICES:-unset} -> $N shard(s)"
-if [ -n "${SMOKE:-}" ]; then
-    "$PY" -u llm_judge.py select test
-    ${G[0]:+env CUDA_VISIBLE_DEVICES=${G[0]}} LLM_SMOKE=$SMOKE "$PY" -u llm_judge.py score test
-    exit 0
-fi
-for split in ${SPLITS:-test train}; do
+SPL=${SPLITS:-test train}
+for split in $SPL; do
     "$PY" -u llm_judge.py select "$split" 2>&1 | tee "$L/llm_select_$split.log"
+done
+# gate on labelled train pairs (needs the train selection; for a test-only run select train just for the gate)
+[[ " $SPL " == *" train "* ]] || "$PY" -u llm_judge.py select train > "$L/llm_select_train_gate.log" 2>&1
+${G[0]:+env CUDA_VISIBLE_DEVICES=${G[0]}} LLM_SMOKE=${GATE_N:-2000} "$PY" -u llm_judge.py score train \
+    2>&1 | tee "$L/llm_gate.log" || { echo "the judge failed the gate, see $L/llm_gate.log"; exit 1; }
+[ -n "${GATE_ONLY:-}" ] && exit 0
+for split in $SPL; do
     pids=()
     for k in $(seq 0 $((N - 1))); do
         ${G[$k]:+env CUDA_VISIBLE_DEVICES=${G[$k]}} SHARD=$k NSHARD=$N \
