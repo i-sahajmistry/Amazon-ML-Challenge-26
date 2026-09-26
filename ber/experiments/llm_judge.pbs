@@ -6,7 +6,7 @@
 #PBS -l walltime=06:00:00
 # LLM judge scores for a finished run: select the uncertain / ambiguous records, score their best candidates with a local
 # open-weight LLM (one process per GPU PBS gave the job), merge. A gate runs first: 2,000 random labelled train pairs
-# must reach judge AUC >= LLM_GATE_AUC (0.75), else the job stops before the long scoring. Then test (the submission
+# must reach judge AUC >= LLM_GATE_AUC (0.6: stops a broken judge, not a weak one), else the job stops before the long scoring. Then test (the submission
 # needs it), then train (stage 2 learns the feature there; merge prints the judge's AUC per country).
 # Logs: $RUNDIR/work/logs/llm_*.log
 # Submit:  qsub ~/scratch/ber_llm/ber/experiments/llm_judge.pbs

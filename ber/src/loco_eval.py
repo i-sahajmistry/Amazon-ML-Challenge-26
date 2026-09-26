@@ -141,6 +141,8 @@ if HOLDOUT:
                             index=pd.MultiIndex.from_arrays([dv.rid.values, dv.sid.values])).loc[idx].values)
     hq = (qs[0] + qs[1]) / 2
     hd["wt"] = np.where(matched[hd.rid.values], 1.0, Wh)
+    # the held-out country's rows and scores, for loco_blend.py (mixing two variants' scores)
+    hd[["rid", "sid", "y", "wt"]].assign(q=hq.astype(np.float32)).to_parquet(f"{X.XD}/loco_q{X.TAG}.parquet")
     print(f"\nheld-out {HOLDOUT}: distractor weight {Wh:.2f}", flush=True)
     summary.append(report(f"{HOLDOUT}, never trained on (all S1)", np.where(s1f == HELD)[0], hd, hq))
     ents89 = np.where((s1f == HELD) & (raw_f >= 8))[0]

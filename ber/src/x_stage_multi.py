@@ -4,7 +4,7 @@ their owner's fold, distractors their hash fold).
   python x_stage.py s1     # stage 1, cross-fitted: folds 4-6 -> A, 7-9 -> B  => x/oof5_train, x/p5_test
   python x_stage.py cv     # stage 2: fit entity folds 4-7, test-like validation on 8-9, refit on 4-9
   python x_stage.py test   # write $OUT/matching_results.tsv + candidate_pairs.tsv"""
-import os, sys, json, numpy as np, pandas as pd, lightgbm as lgb
+import os, re, sys, json, numpy as np, pandas as pd, lightgbm as lgb
 from common import WORK, ROOT, load, HOLDOUT, HELD
 from harness import truth_arrays, score
 from match import to_sets, write_tsv
@@ -28,6 +28,13 @@ PSEUDO_W = float(os.environ.get("PSEUDO_W", 1.0))   # weight of pseudo-labelled 
 # llm_judge.py: an offline LLM's log-odds that the record and its best S1 are the same business, the best score among
 # the record's other judged candidates, and the gap; NaN where the record was not judged (confident records)
 LLMF = ["llm", "llm_alt", "llm_gap"] if os.environ.get("LLM") else []
+# DROP=<regex>: leave the matching features out of both stages (loco_unseen.pbs: do judges that do not lean on the
+# learned readers transfer better to a country no model saw?), e.g. "^ce" = no cross-encoder features
+DROP = os.environ.get("DROP", "")
+
+
+def _drop(F):
+    return F.drop(columns=[c for c in F.columns if re.search(DROP, c)]) if DROP else F
 
 
 def _other_max(g, x):
@@ -65,7 +72,7 @@ def stage1_data(split):
         parts.append(pd.read_parquet(f"{XD}/llr_{split}.parquet", columns=LLRF))
     if WORDF:
         parts.append(pd.read_parquet(f"{XD}/words_{split}.parquet", columns=WORDF))
-    F = pd.concat(parts, axis=1)
+    F = _drop(pd.concat(parts, axis=1))
     return keys, F
 
 
@@ -183,7 +190,7 @@ def train_rows():
 def design(d):
     X = d[["p", "p2"] + [c for c in d.columns if c.startswith("e_")] + ["rec_n20"] + S1F + CEF + EXF + LLRF + WORDF
           + LLMF].astype(np.float32)
-    return X.assign(margin=X.p - X.p2)
+    return _drop(X).assign(margin=X.p - X.p2)
 
 
 def cv():

@@ -1,0 +1,30 @@
+#!/bin/bash
+#PBS -N unseen_main
+#PBS -P scai
+#PBS -q scai_q
+#PBS -l select=1:ncpus=12:ngpus=1:mem=400gb
+#PBS -l walltime=04:00:00
+# The submission with a DROP variant for the countries absent from train (France), after loco_unseen.pbs showed it
+# helps India when India was never trained on. On the finished v8 run: stage 1 + 2 without the DROP features
+# (x_stage_multi.py s1, x_nocopy.py test), then x_final.py takes those countries' records from the variant
+# (Q_UNSEEN, mixed with v8 at Q_MIX as in loco_blend.py) and every other country from v8, validates.
+# Submit:  qsub -v V=dce,Q_MIX=1.0 ~/scratch/ber_unseen/ber/experiments/unseen_main.pbs
+#          (V, Q_MIX, THR, THR_UNSEEN: the winner on India in loco_unseen.pbs)
+PY=${PY:-$HOME/scratch/miniconda3/envs/amlc312/bin/python}
+set -ex -o pipefail
+R=${RUNDIR:-$HOME/scratch/amlc_v8}
+V=${V:-dce}
+declare -A DROPS=([dce]='^ce' [dstr]='^ce|^score$|^gap_top1$|^gap_next$|^rank$|^s1_rank$')
+export AMLC_ROOT=$R SHORTLIST=learned:0.001 CE_TAGS=,_raw WORDS=1 NT=12 NCPUS=12
+L=$R/work/logs
+cd "${CODE:-$HOME/scratch/ber_unseen}/ber/src"
+test -e "$R/work/x/test_q_v8w.parquet"   # the v8 stage-2 test scores the variant is combined with
+[ -e "$L/unseen_s1_$V.ok" ] || { TAG=_v8$V DROP="${DROPS[$V]}" "$PY" -u x_stage_multi.py s1 2>&1 | tee "$L/unseen_s1_$V.log"; touch "$L/unseen_s1_$V.ok"; }
+[ -e "$L/unseen_s2_$V.ok" ] || { TAG=_v8$V DROP="${DROPS[$V]}" "$PY" -u x_nocopy.py test 2>&1 | tee "$L/unseen_s2_$V.log"; touch "$L/unseen_s2_$V.ok"; }
+[ -n "${THR_UNSEEN:-}" ] && export THR_UNSEEN
+OUT=$R/output_v8U_$V${Q_MIX:+_m$Q_MIX}${THR_UNSEEN:+_u$THR_UNSEEN}
+Q_UNSEEN=_v8${V}w Q_MIX=${Q_MIX:-1.0} "$PY" -u x_final.py "$OUT" _v8w "${THR:-0.70}" 2>&1 | tee "$L/unseen_final_$V.log"
+cd "$HOME/scratch/amlc_data/student_resource"
+"$PY" utils/validate_submission.py --matching "$OUT/matching_results.tsv" --candidate "$OUT/candidate_pairs.tsv" \
+    --test-dir dataset/test
+echo "unseen_main done: $OUT $(date +%T)"

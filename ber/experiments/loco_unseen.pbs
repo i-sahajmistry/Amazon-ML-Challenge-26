@@ -1,0 +1,43 @@
+#!/bin/bash
+#PBS -N loco_unseen
+#PBS -P scai
+#PBS -q scai_q
+#PBS -l select=1:ncpus=8:ngpus=1:mem=400gb
+#PBS -l walltime=03:00:00
+# Do judges that lean less on the learned readers transfer better to a country no model saw? On the finished
+# held-out-India run: retrain stage 1 + 2 without some features (x_stage_multi.py DROP=<regex>) and score India like
+# test (loco_eval.py), then mix each variant with v8 on India (loco_blend.py). India's labels are only used to score.
+#   dce   no cross-encoder features (both CEs were fine-tuned on the trained countries' text)
+#   dstr  no CE and no bi-encoder retrieval score / gaps / ranks (the e5 embedder was fine-tuned too): string features,
+#         mined dictionaries and the word model only
+# Baseline: India 'never trained on (crc folds 8-9)' 0.90727, all S1 0.90699 at 0.70; US trained 0.99192.
+# CPU only (scai_q requires a GPU). Resumable: every step leaves work/logs/unseen_<step>.ok.
+# Logs: ~/scratch/amlc_loco_india/work/logs/unseen_*.log
+# Submit:  qsub ~/scratch/ber_unseen/ber/experiments/loco_unseen.pbs
+PY=${PY:-$HOME/scratch/miniconda3/envs/amlc312/bin/python}
+set -e
+R=${RUNDIR:-$HOME/scratch/amlc_loco_india}
+export AMLC_ROOT=$R HOLDOUT=${HOLDOUT:-India} SKIP_TEST=1 SHORTLIST=learned:0.001 NT=8 NCPUS=8 CE_TAGS=,_raw WORDS=1
+L=$R/work/logs
+mkdir -p "$L" "$R/work/x"
+cd "${CODE:-$HOME/scratch/ber_unseen}/ber/src"
+
+run() {   # run <step> <env assignments...> -- <script> <args...>
+    local n=unseen_$1; shift
+    if [ -e "$L/$n.ok" ]; then echo "skip $n (done)"; return 0; fi
+    local envs=(); while [ "$1" != "--" ]; do envs+=("$1"); shift; done; shift
+    echo "start $n $(date +%T)"
+    env "${envs[@]}" "$PY" -u "$@" > "$L/$n.log" 2>&1 || { echo "FAILED $n, see $L/$n.log"; tail -20 "$L/$n.log"; exit 1; }
+    touch "$L/$n.ok"; echo "done $n $(date +%T)"
+}
+
+run eval_v8 TAG=_v8 -- loco_eval.py              # the baseline again, to save its India scores for the mixing
+declare -A DROPS=([dce]='^ce' [dstr]='^ce|^score$|^gap_top1$|^gap_next$|^rank$|^s1_rank$')
+for v in ${VARIANTS:-dce dstr}; do
+    run "s1_$v" TAG=_v8$v "DROP=${DROPS[$v]}" -- x_stage_multi.py s1
+    run "eval_$v" TAG=_v8$v "DROP=${DROPS[$v]}" -- loco_eval.py
+    run "blend_$v" A=_v8 B=_v8$v -- loco_blend.py
+done
+for v in v8 ${VARIANTS:-dce dstr}; do echo "== $v"; grep -A6 "^SUMMARY" "$L/unseen_eval_$v.log"; done
+for v in ${VARIANTS:-dce dstr}; do grep -A12 "^SUMMARY" "$L/unseen_blend_$v.log"; done
+echo "loco_unseen done $(date +%T)"

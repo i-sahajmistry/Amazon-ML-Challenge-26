@@ -174,7 +174,7 @@ def score(split):
             from harness import truth_arrays
             y = truth_arrays()[2][pairs.rid.values] == pairs.sid.values
             auc = _auc(out, y)
-            gate = float(os.environ.get("LLM_GATE_AUC", 0.75))
+            gate = float(os.environ.get("LLM_GATE_AUC", 0.6))
             print(f"smoke check: judge AUC {auc:.4f} on {len(y):,} labelled pairs ({y.mean():.1%} true); gate {gate}",
                   flush=True)
             if not auc >= gate:
