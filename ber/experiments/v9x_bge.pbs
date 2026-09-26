@@ -1,0 +1,16 @@
+#!/bin/bash
+#PBS -N v9x_bge
+#PBS -P scai
+#PBS -q scai_q
+#PBS -l select=1:ncpus=2:ngpus=1:mem=64gb
+#PBS -l walltime=00:40:00
+# bge everywhere, no LLM: v9p_frand's rule with both stacks rebuilt with the bge cross-encoder. US / India from the bge
+# stack (_v9gpw), France from it vetoed by the bge self-trained stack (_v9gspw). Compared with v9p_frand (0.984742)
+# the only change is bge. Validated.
+PY=$HOME/scratch/miniconda3/envs/amlc312/bin/python
+R=/scratch/scai/mtech/aib262045/amlc_v9x; OUT=$R/output_v9x_e
+export AMLC_ROOT=$R
+cd $HOME/scratch/ber_v9x/ber/src
+FROM="France:_v9gspw:min" "$PY" -u x_final.py "$OUT" _v9gpw 0.70
+cd $HOME/scratch/amlc_data/student_resource
+"$PY" utils/validate_submission.py --matching "$OUT/matching_results.tsv" --candidate "$OUT/candidate_pairs.tsv" --test-dir dataset/test

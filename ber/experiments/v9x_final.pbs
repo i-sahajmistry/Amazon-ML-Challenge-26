@@ -1,0 +1,15 @@
+#!/bin/bash
+#PBS -N v9x_final
+#PBS -P scai
+#PBS -q scai_q
+#PBS -l select=1:ncpus=2:ngpus=1:mem=64gb
+#PBS -l walltime=00:40:00
+# Best-guess submission: US / India from the bge stack (_v9gpw, validation 0.99293), France from the bge + LLM stack
+# vetoed by the bge self-trained + LLM stack. Validated.
+PY=$HOME/scratch/miniconda3/envs/amlc312/bin/python
+R=/scratch/scai/mtech/aib262045/amlc_v9x; OUT=$R/output_v9x_d
+export AMLC_ROOT=$R
+cd $HOME/scratch/ber_v9x/ber/src
+FROM="France:_v9gpLw,France:_v9gspLw:min" "$PY" -u x_final.py "$OUT" _v9gpw 0.70
+cd $HOME/scratch/amlc_data/student_resource
+"$PY" utils/validate_submission.py --matching "$OUT/matching_results.tsv" --candidate "$OUT/candidate_pairs.tsv" --test-dir dataset/test
