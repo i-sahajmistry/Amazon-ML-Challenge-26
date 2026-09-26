@@ -64,7 +64,7 @@ If e is higher, bge is worth building on (next step below); b vs e would then sp
 - US/India always come from a stack without LLM features in files a/c/d: a stack trained with LLM values for
   unsure US/India records would see them missing at test (only France is judged).
 
-## Evidence from the leave-one-country-out runs (v8 pipeline, code on local branch `v8-work`)
+## Evidence from the leave-one-country-out runs (v8 pipeline, code on branch `v8-loco-llm`: `loco_eval.py`, `pseudo.py`, `llm_judge.py`, `experiments/loco.pbs`)
 
 India removed from every training step (embedder, shortlist, cross-encoders, judges), then scored like test.
 - India never trained on: **0.90727** (crc folds 8–9) vs trained 0.99363; US 0.99192.
