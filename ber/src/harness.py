@@ -1,8 +1,8 @@
 """Test-like evaluation harness (fold-9 S1 entities, clean records, distractors resampled to ~39%).
 build(k): k = DataFrame(rid, sid, p) for train candidate pairs. Returns per-row arrays (sid, p, is_true) of every
 record copy whose best candidate is a fold-9 entity, and T (true match count) per S1."""
-import numpy as np, pandas as pd
-from common import load, s1_fold
+import os, numpy as np, pandas as pd
+from common import load, s1_fold, WORK
 from match import assign
 
 def truth_arrays():
@@ -13,6 +13,19 @@ def truth_arrays():
     ts = np.full(len(other), -1, np.int64)
     ts[rid_of.loc[pairs.m].values] = pd.Series(np.arange(len(s1)), index=s1.entity_id).loc[pairs.source1_entity_id].values
     s1f = s1_fold(s1.entity_id.tolist()); rf = s1_fold(other.entity_id.tolist()); rf[ts >= 0] = s1f[ts[ts >= 0]]
+    if os.environ.get("DFOLD"):
+        # a distractor takes the fold of the S1 it imitates (its top-1 retrieved S1), not a hash of its own id: whole
+        # entity groups stay in one fold, so no distractor is lost to the cross-encoders' folds and every stage-1/2
+        # entity keeps all its distractors (with the hash, 0.73 of 1.22 per S1)
+        f = f"{WORK}/imitated_train.npy"
+        if not os.path.exists(f):
+            c = pd.read_parquet(f"{WORK}/cand_train.parquet", columns=["rid", "sid", "rank"])
+            c = c[c["rank"].values == 0]
+            im = np.full(len(other), -1, np.int64); im[c.rid.values] = c.sid.values
+            np.save(f, im)
+        im = np.load(f)
+        d = (ts < 0) & (im >= 0)
+        rf[d] = s1f[im[d]]
     return s1, other, ts, s1f, rf
 
 def wscore(sid, acc, tru, wt, T, ents):

@@ -98,6 +98,50 @@ PLANS["v9s"] = [("v9s_rs_fit", ["x_ce3.py", "train"], {**_RS, "CE_INIT": f"{WORK
                 ("v9s_s2p", ["x_nocopy.py", "test"], {**_ST, "BAG": "5", "PEERS": "1"})]   # -> x/test_q_v9spw
 # v9p = v9 + house-number peer context in stage 2 -> x/test_q_v9pw
 PLANS["v9p"] = [("v9_s2p", ["x_nocopy.py", "test"], {**_V9, "TAG": "_v9", "BAG": "5", "PEERS": "1"})]
+# v9s2 = a second self-training round seeded by v9p_frand's France decisions (the veto rejects decoys the first
+# self-trained stack accepted); CEs restart from the originals so round 1's "same address" bias is not inherited
+_RS2 = {"CE_TEXT": "raw", "CE_DIR": f"{WORK}/x/ce_rs2", "CE_TAG": "_rs2"}
+_NS2 = {"CE_DIR": f"{WORK}/x/ce_ns2", "CE_TAG": "_ns2"}
+_SELF2 = {**_SELF, "SELF": f"{WORK}/x/test_q_v9pfr.parquet"}
+_ST2 = {"CE_TAGS": "_ns2,_rs2", "TAG": "_v9s2"}
+PLANS["v9s2"] = [("v9s2_seed", ["x_final.py", "-", "_v9pw"], {"FROM": "France:_v9spw:min", "SAVE_Q": "_v9pfr"}),
+                 ("v9s2_rs_fit", ["x_ce3.py", "train"], {**_RS2, "CE_INIT": f"{WORK}/x/ce_raw", **_SELF2}),
+                 ("v9s2_ns_fit", ["x_ce3.py", "train"], {**_NS2, "CE_INIT": f"{WORK}/x/ce", **_SELF2}),
+                 ("v9s2_rs_train", ["x_ce3.py", "score", "train"], _RS2),
+                 ("v9s2_rs_test", ["x_ce3.py", "score", "test"], _RS2),
+                 ("v9s2_ns_train", ["x_ce3.py", "score", "train"], _NS2),
+                 ("v9s2_ns_test", ["x_ce3.py", "score", "test"], _NS2),
+                 ("v9s2_s1", ["x_stage_multi.py", "s1"], {**_ST2, "S1K": "3"}),
+                 ("v9s2_s2p", ["x_nocopy.py", "test"], {**_ST2, "BAG": "5", "PEERS": "1"})]   # -> x/test_q_v9s2pw
+# v10 = v9p with distractors in the fold of the S1 they imitate (DFOLD=1): both CEs retrained on folds 0-3 entity
+# groups, re-scored, stage 1 over 3 groups, stage 2 with peers and 5 seeds -> x/test_q_v10pw
+_D = {"DFOLD": "1"}
+_R10 = {**_D, "CE_TEXT": "raw", "CE_DIR": f"{WORK}/x/ce_r10", "CE_TAG": "_r10"}
+_N10 = {**_D, "CE_DIR": f"{WORK}/x/ce_n10", "CE_TAG": "_n10"}
+_ST10 = {**_D, "CE_TAGS": "_n10,_r10", "TAG": "_v10"}
+PLANS["v10"] = [("v10_r_fit", ["x_ce3.py", "train"], {**_R10, "CE_N": "12000000"}),
+                ("v10_n_fit", ["x_ce3.py", "train"], {**_N10, "CE_N": "12000000"}),
+                ("v10_r_train", ["x_ce3.py", "score", "train"], _R10),
+                ("v10_r_test", ["x_ce3.py", "score", "test"], _R10),
+                ("v10_n_train", ["x_ce3.py", "score", "train"], _N10),
+                ("v10_n_test", ["x_ce3.py", "score", "test"], _N10),
+                ("v10_s1", ["x_stage_multi.py", "s1"], {**_ST10, "S1K": "3"}),
+                ("v10_s2p", ["x_nocopy.py", "test"], {**_ST10, "BAG": "5", "PEERS": "1"})]
+# v10s3 = self-training round 3 on the v10 base: seeded by v10_fr2's France decisions (v10 + both France vetoes,
+# leaderboard 0.985942), both v10 CEs continued, re-scored, stages -> x/test_q_v10s3pw (a third France veto)
+_RS3 = {**_D, "CE_TEXT": "raw", "CE_DIR": f"{WORK}/x/ce_rs3", "CE_TAG": "_rs3"}
+_NS3 = {**_D, "CE_DIR": f"{WORK}/x/ce_ns3", "CE_TAG": "_ns3"}
+_SELF3 = {**_SELF, "SELF": f"{WORK}/x/test_q_v10fr.parquet"}
+_ST3 = {**_D, "CE_TAGS": "_ns3,_rs3", "TAG": "_v10s3"}
+PLANS["v10s3"] = [("v10s3_seed", ["x_final.py", "-", "_v10pw"], {"FROM": "France:_v9spw:min,France:_v9s2pw:min", "SAVE_Q": "_v10fr"}),
+                  ("v10s3_rs_fit", ["x_ce3.py", "train"], {**_RS3, "CE_INIT": f"{WORK}/x/ce_r10", **_SELF3}),
+                  ("v10s3_ns_fit", ["x_ce3.py", "train"], {**_NS3, "CE_INIT": f"{WORK}/x/ce_n10", **_SELF3}),
+                  ("v10s3_rs_train", ["x_ce3.py", "score", "train"], _RS3),
+                  ("v10s3_rs_test", ["x_ce3.py", "score", "test"], _RS3),
+                  ("v10s3_ns_train", ["x_ce3.py", "score", "train"], _NS3),
+                  ("v10s3_ns_test", ["x_ce3.py", "score", "test"], _NS3),
+                  ("v10s3_s1", ["x_stage_multi.py", "s1"], {**_ST3, "S1K": "3"}),
+                  ("v10s3_s2p", ["x_nocopy.py", "test"], {**_ST3, "BAG": "5", "PEERS": "1"})]
 ARGS = sys.argv[1:]
 PLAN = ARGS.pop(0) if ARGS and ARGS[0] in PLANS else "v5"   # python x_chain.py [plan] [first_step]
 STEPS = PLANS[PLAN]

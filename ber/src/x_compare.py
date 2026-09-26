@@ -1,13 +1,16 @@
 """Compare test submissions without labels:
   - per country: matches per S1, empty S1s, and how far the set-size distribution is from the train truth's;
   - pairwise macro F0.5 of one file (row) scored as if another file (column) were the truth.
-  python x_compare.py"""
+  python x_compare.py
+  FILES="a=output_x/matching_results.tsv,b=..." python x_compare.py"""
 import numpy as np, pandas as pd
 from common import ROOT, load
 
 FILES = {"v4": "output_v4/matching_results.tsv", "v5": "output_v5/matching_results.tsv",
          "v5f": "output_v5f/matching_results.tsv", "sarvesh_old": "teammates/sarvesh_old.tsv",
          "sarvesh_gap": "teammates/sarvesh_gap.tsv", "mohanish": "teammates/mohanish_fix.tsv"}
+if __import__("os").environ.get("FILES"):   # FILES="name=path,name=path" (paths relative to ROOT)
+    FILES = dict(x.split("=", 1) for x in __import__("os").environ["FILES"].split(","))
 s1 = load("test", 1)
 IDX, C, N = pd.Index(s1.entity_id), s1.country.values, len(s1)
 

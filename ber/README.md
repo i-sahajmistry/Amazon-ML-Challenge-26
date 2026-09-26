@@ -2,9 +2,13 @@
 
 Match every Source 2 / Source 3 record to the Source 1 (reference) entity it belongs to, scored by macro F0.5.
 
-**Leaderboard best: v9p_frand, 0.984742** (2026-09-26; v7w was 0.982641). The public and private leaderboards are both
-subsets of the provided test file, so every country scored is one we see: US, India and France.
-**Current pipeline: v9p_frand**: the v8 design (scalable HNSW blocking + calibrated shortlist, a lexicon learned per
+**Leaderboard best: v10_fr2, 0.985942** (2026-09-26; v9p_frand 0.984742, v7w 0.982641). The public and private
+leaderboards are both subsets of the provided test file, so every country scored is one we see: US, India and France.
+**Current pipeline: v10_fr2** = v9p_frand (below) with two changes, see [After v9p_frand](#after-v9p_frand-v10_fr2):
+distractors are assigned to the fold of the S1 they imitate, so every training entity keeps all its distractors
+(validation 0.99285 vs 0.99277 on the same records), and a second self-training round adds a second France veto.
+
+**v9p_frand**: the v8 design (scalable HNSW blocking + calibrated shortlist, a lexicon learned per
 country, no hand-written tables) with a shortlist that also sees text similarities (7.4 candidate pairs per S1 on test,
 v8 10.0, top-5 28.7), stage 2 that also sees the records claiming the same S1 at the same house number (validation
 0.99277, v8 0.99236), and, for the country without training labels (France), cross-encoders self-trained on their own
@@ -137,7 +141,11 @@ Validation: entity folds 8–9, distractors at the test share of 39%, macro F0.5
 | v9 | shortlist with text similarities, stage 1 over 3 fold groups, 5-seed stage 2 | 0.99252 copy-free | – |
 | v9p | + house-number peers in stage 2 | 0.99277 copy-free | 0.982690 |
 | v9s | cross-encoders self-trained on France (costs US / India a little) | 0.99245 copy-free | – |
-| **v9p_frand** | v9p; a France record needs the self-trained stack (v9s + peers) to agree | **0.99277** (US / India = v9p) | **0.984742** |
+| v9p_frand | v9p; a France record needs the self-trained stack (v9s + peers) to agree | 0.99277 (US / India = v9p) | 0.984742 |
+| v9s2p | self-training round 2, seeded by v9p_frand's France decisions | 0.99274 copy-free | – |
+| v10 | v9p with distractors in the fold of the S1 they imitate, both CEs retrained | 0.99285 on v9p's rows (0.99262 on its own, harder set) | – |
+| **v10_fr2** | v10; a France record needs both self-trained stacks (v9sp, v9s2p) to agree | **0.99285** | **0.985942** |
+| v9p + LLM judge | Qwen3-Reranker-4B (LoRA) blended into the unsure records | 0.99297 (cross-fitted) | pending |
 
 Validation scores are at threshold 0.70 from v9 on.
 
@@ -145,7 +153,10 @@ Tried without gain: word-edit log-likelihood features (`x_llr.py`, 0.99274 vs 0.
 2 (`x_top2.py`, 0.99278 either way), an expected-F0.5 decision per S1 instead of a threshold (v3: 0.9775 vs 0.9788),
 six stage-1 fold groups instead of three (0.99234 vs 0.99241), separate thresholds per score bucket (`x_verr.py`,
 +0.00001 to +0.00005), taking every France decision from the self-trained stack instead of using it as a veto
-(`v9p_frs`, see step 7).
+(`v9p_frs`, see step 7), a "shifted house number shared with another claimant" veto (`x_final.py NUMVETO`, see below:
+validation 0.99277 → 0.99074 for the US), a learned decoy-word veto (`x_decoyveto.py`: precise, but the models already
+reject nearly all such records), and, in Mohanish's branch `v9fS`, a LightGBM + XGBoost judge (0.99259 vs 0.99258) and
+`bge-reranker-v2-m3` as a third cross-encoder (fold-9 argmax 0.98173 vs 0.98169 / 0.98227).
 
 Cross-encoders on their own (fold 9, share of real records whose argmax is the right S1): normalised e5-small 0.98237,
 e5-base 0.98211, raw-text e5-small 0.98290; pair AUC 0.99984–0.99986. They add value through stacking.
@@ -153,17 +164,47 @@ e5-base 0.98211, raw-text e5-small 0.98290; pair AUC 0.99984–0.99986. They add
 Where the remaining validation errors are (`x_errors.py` and the other `x_*.py` diagnostics, v5): 73% of missed true matches and 89.5% of
 blocking misses are records with an empty address whose name is shared by several S1 entities.
 
+## After v9p_frand (v10_fr2)
+
+The S1 folds are balanced (`x_folds.py`: per fold ~220k S1s, 60% US, 5.6% singletons, 3.46 matches per S1, ~268k
+distractors, 4.4% empty addresses), but distractors took a hash of their own id as fold. Stages 1 and 2 drop those
+in folds 0–3 (the cross-encoders saw them), so a training / validation entity kept 0.73 of its 1.22 distractors per S1
+(test: about 2.1).
+
+- **v10** (`DFOLD=1` in `harness.truth_arrays`): a distractor takes the fold of the S1 it imitates (its top-1 retrieved
+  S1). Whole entity groups stay in one fold: the cross-encoders train on folds 0–3 entities with all their distractors
+  and stages 1–2 use every distractor of folds 4–9. Both cross-encoders retrained, then as v9p. 0.99285 vs 0.99277 on
+  v9p's validation rows; 0.99262 on its own validation, which now holds every distractor of its entities.
+- **Self-training round 2** (`x_chain.py v9s2`): pseudo-labels from v9p_frand's France decisions (a match only if both
+  stacks are confident), cross-encoders restarted from the originals. 26 of 30 sampled extra rejections are decoys
+  ("& Fils", "& Associés", "Développement", a swapped word). v10_fr2 = v10 with both vetoes
+  (`FROM=France:_v9spw:min,France:_v9s2pw:min`).
+- **Number rule, rejected**: reject a record whose first house number is within 13 of its S1's, shares no number with
+  it and equals another claimant's. Test samples looked like decoys, but on validation it rejects accepted rows that
+  are 99.6% true matches (true matches carry ±1–10 number noise, and their same-source duplicates share it): US 0.99277
+  → 0.99074, India → 0.99134. Kept only as a probe (`x_final.py NUMVETO=`).
+- **Blocking cost** (`x_annloss.py`): 972 validation records (0.063%) whose true S1 exact search ranks first are missing
+  from the HNSW top 20, spread over 945 S1s (so not unreachable graph nodes). With the shortlist, blocking costs about
+  0.00025 validation F0.5 against exact search.
+- **LLM judge** (`x_llm.py`, `x_llmstack.py`): `Qwen/Qwen3-Reranker-4B` (Apache-2.0, 4.0B parameters; Qwen3-8B has
+  8.19B, over the 8B limit), LoRA r 16 on 120k train records of folds 4–7 whose stage-1 p is unsure, raw text,
+  logit(yes) − logit(no). On validation's 58.6k unsure rows it is weaker alone (AUC 0.844 vs 0.936 for stage 2) but
+  complementary: a logistic blend with stage 2 gives 0.99297 vs 0.99277 (cross-fitted over the S1s).
+- **Self-training round 3** (`x_chain.py v10s3`): seeded by v10_fr2, cross-encoders continued from v10's.
+
 ## Leaderboard
 
 | File | Score |
 |---|---|
-| **v9p_frand** | **0.984742** |
+| **v10_fr2** | **0.985942** |
+| v9p_frand | 0.984742 |
 | v9p | 0.982690 |
 | v7w | 0.982641 |
 | v7w with every France S1 left empty (probe) | 0.851155 |
 | v4, Sarvesh's run | 0.967214 |
 | Rank 1 (2026-09-25 ~22:45) | 0.988319 |
 | 5th place (2026-09-26 morning) | > 0.988 |
+| Rank 1 / 5th place (2026-09-26 ~15:00) | 0.990556 / 0.98857 |
 
 An empty prediction scores 1 on an S1 with no true matches and 0 otherwise. France is s = 259,452 / 1,732,544 =
 14.975% of test S1s, and about e = 5.5% of them should have no match (train prior and our predictions). So:
@@ -176,6 +217,8 @@ v9p and v9p_frand differ only in France (23.6k of its 1.42M records), so their d
 0.002052 / s = **+0.0137 on France** from the self-trained veto. v9p against v7w is +0.00005; if US / India gained what
 validation says (+0.0003 overall), France lost about 0.0017 in v8 / v9 (the France word rule of v7w was replaced by
 learned statistics). That puts France at about 0.931 in v9p and **0.945 in v9p_frand**, still the whole gap to the top.
+v10_fr2 adds +0.0012: about +0.0001 from v10 on US / India (validation) and +0.0011 from France (round-2 veto and the
+v10 model), so France is about **0.952**. A top-5 score (0.98857) needs France near 0.97.
 
 What changed from v4 (0.967) besides the models, from teammates' reviews:
 - Mohanish: v4's stage 2 learned that an *averaged* stage-1 probability marks a distractor (only distractors of hash
@@ -222,6 +265,15 @@ python x_chain.py v9p                # + house-number peers -> work/x/test_q_v9p
 python x_chain.py v9s                # both CEs continued on confident France decisions of v8, re-scored,
                                      # stages with and without peers -> work/x/test_q_v9spw.parquet   (~1.5 h)
 FROM=France:_v9spw:min python x_final.py ../output_v9p_frand _v9pw 0.70   # matching_results + candidate_pairs
+```
+Then v10_fr2 and the LLM judge (GPU 2 of the node with `GPU_IDX=1` in our `run.sh`):
+```bash
+python x_chain.py v9s2               # self-training round 2 -> work/x/test_q_v9s2pw.parquet
+python x_chain.py v10                # DFOLD=1: CEs retrained, re-scored, stages -> work/x/test_q_v10pw.parquet
+FROM=France:_v9spw:min,France:_v9s2pw:min python x_final.py ../output_v10_fr2 _v10pw 0.70
+python x_llm.py train && python x_llm.py val && python x_llm.py test   # Qwen3-Reranker-4B LoRA (LLM=/path)
+python x_llmstack.py _v9p _v10p      # blend into v10's unsure records -> work/x/test_q_v10plw.parquet
+FROM=France:_v9spw:min,France:_v9s2pw:min python x_final.py ../output_v10_fr2_llm _v10plw 0.70
 ```
 `x_chain.py` runs each step in order and logs it to `work/logs/<step>.log`; the plans list the exact commands and
 environment (`python x_chain.py <plan> <first_step>` resumes). `python x_final.py ../output_v9p _v9pw 0.70` writes

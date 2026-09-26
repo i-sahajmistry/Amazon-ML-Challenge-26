@@ -3,6 +3,7 @@ x_nocopy.py test or x_thr.py): each record goes to its best S1 when q >= THR. On
   python x_final.py OUT_DIR [TAG] [THR]     # TAG "v5" = untagged (run.sh drops empty args)
   FROM=France:_v9sw[:min] THR_C=France:0.8 ...  # one country's q from another model (or the min of both) /
                                             # its own threshold
+  NUMVETO=US,France MAXD=13 ...            # reject decoy groups at a shifted house number (see below)
   BLANK=<country> python x_final.py ...    # leaderboard probe: that country's S1s left empty, so the score
                                             # difference to the full file isolates that country
   python x_final.py sweep [TAG]             # per country: S1s with no match / matches per S1, by threshold"""
@@ -24,6 +25,9 @@ for spec in filter(None, os.environ.get("FROM", "").split(",")):   # "France:_v9
         m = d[d.c == c].merge(e[["rid", "sid", "q"]], on="rid", how="left", suffixes=("", "_b"))
         e = m.assign(q=np.where(m.sid.values == m.sid_b.values, np.minimum(m.q.values, m.q_b.values), 0.0))[["rid", "sid", "q", "c"]]
     d = pd.concat([d[d.c != c], e], ignore_index=True)
+if os.environ.get("SAVE_Q"):   # keep the combined q (e.g. the France veto) as x/test_q{SAVE_Q}, a self-training seed
+    d.to_parquet(f"{WORK}/x/test_q{os.environ['SAVE_Q']}.parquet")
+    sys.exit()
 s1 = load("test", 1); other = pd.concat([load("test", 2), load("test", 3)], ignore_index=True)
 if OUT == "sweep":
     n = s1.country.value_counts()
@@ -33,6 +37,22 @@ if OUT == "sweep":
         print(f"thr {t:.2f}  " + "  ".join(f"{c} {1 - has[s1.country.values == c].mean():.4f}/{(a.c == c).sum() / n[c]:.3f}"
                                           for c in n.index), flush=True)
     sys.exit()
+if os.environ.get("NUMVETO"):
+    # decoy groups: test distractors come in groups at a shifted house number (VX Centre 14 -> two decoys at 15), which
+    # train distractors almost never do (same-number peers: 52-78% of test records below q 0.5, 7% of train distractors).
+    # Reject a record whose first number is near its S1's but not shared with it when another record claiming that S1
+    # has the same number. NUMVETO=US,France lists the countries; MAXD the largest shift.
+    from match import normed
+    ints = lambda x: [int(t[:15]) for t in x.split()]
+    R = [ints(x) for x in pd.concat([normed("test", 2), normed("test", 3)], ignore_index=True).num.values[d.rid.values]]
+    S = [ints(x) for x in normed("test", 1).num.values[d.sid.values]]
+    kr = np.array([x[0] if x else -1 for x in R]); ks = np.array([x[0] if x else -1 for x in S])
+    peer = d.assign(k=kr).groupby(["sid", "k"]).sid.transform("size").values > 1
+    apart = np.array([bool(a) and bool(b) and a[0] not in b and b[0] not in a for a, b in zip(R, S)])
+    veto = (apart & (np.abs(kr - ks) <= int(os.environ.get("MAXD", 13))) & peer & (kr >= 0)
+            & d.c.isin(os.environ["NUMVETO"].split(",")).values)
+    print("number veto:", pd.Series(d.c.values[veto & (d.q.values >= THR)]).value_counts().to_dict(), "accepted records", flush=True)
+    d.loc[veto, "q"] = 0.0
 thr = np.full(len(d), THR)
 for spec in filter(None, os.environ.get("THR_C", "").split(",")):  # "France:0.8": that country's threshold
     c, t = spec.split(":")
