@@ -50,7 +50,7 @@ for f in feats2_train.parquet feats2_test.parquet oof_train.parquet cand_train.p
          x/test_q_v9pw.parquet x/test_q_v9spw.parquet x/p5_test_v9pw.parquet; do
     [ -e "$W/$f" ] || { echo "missing v9 input $W/$f"; exit 1; }
 done
-rm -rf "$X"/llm_lock_*   # claims of a previous, interrupted run
+[ -n "${CLEAR_LOCKS:-}" ] && rm -rf "$X"/llm_lock_*   # claims of an interrupted run (only when no other job is scoring)
 
 run() {   # run <step> <env assignments...> -- <script> <args...>: skipped when <step>.ok exists
     local n=$1; shift
