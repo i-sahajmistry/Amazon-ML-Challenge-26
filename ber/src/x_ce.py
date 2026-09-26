@@ -114,6 +114,7 @@ def train():
     n = int(len(a) * EPOCHS)
     order = np.concatenate([rng.permutation(len(a)) for _ in range(math.ceil(EPOCHS))])[:n]
     print(f"train pairs {len(a)}  pos {y.mean():.3f}  steps {math.ceil(n / BS)}  lr {LR}", flush=True)
+    torch.manual_seed(0)   # the new score head's weights, dropout
     model = AutoModelForSequenceClassification.from_pretrained(BASE, num_labels=1, attn_implementation="sdpa").cuda()
     opt = torch.optim.AdamW(model.parameters(), lr=LR, weight_decay=0.01)
     steps = math.ceil(n / BS)

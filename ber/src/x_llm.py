@@ -107,6 +107,7 @@ def train():
         o = rng.permutation(len(P)); P = [P[i] for i in o]; y = y[o]
         print(f"+ pseudo-labelled {ctry}: {len(pos)} confident matches, {len(neg)} confident non-matches; "
               f"{len(q)} pairs used; total {len(P)}", flush=True)
+    torch.manual_seed(0)   # LoRA weights, dropout
     m = model(True); m.print_trainable_parameters()
     opt = torch.optim.AdamW([p for p in m.parameters() if p.requires_grad], lr=LR, weight_decay=0.0)
     steps = math.ceil(len(P) / BS); warm = int(0.03 * steps)

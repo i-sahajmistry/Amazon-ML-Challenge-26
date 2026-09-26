@@ -179,6 +179,7 @@ def train():
     batches = batches[:int(len(batches) * EPOCHS / math.ceil(EPOCHS))]
     steps = len(batches)
     print(f"train pairs {len(a)}  pos {y.mean():.3f}  steps {steps}  lr {LR}  init {INIT}", flush=True)
+    torch.manual_seed(0)   # a new score head's weights, dropout
     model = AutoModelForSequenceClassification.from_pretrained(INIT, num_labels=1, attn_implementation="sdpa").cuda()
     opt = torch.optim.AdamW(model.parameters(), lr=LR, weight_decay=0.01)
     sched = get_linear_schedule_with_warmup(opt, int(0.03 * steps), steps)
