@@ -11,10 +11,10 @@
 We resolve every Source 2 / Source 3 record on its own: find its best Source 1 (S1) entity in a small learned
 candidate set, then accept or reject that one link with models that also see every other record claiming the same
 entity. Blocking uses a fine-tuned multilingual bi-encoder, HNSW search and a calibrated LightGBM shortlist. It produces
-7.37 candidate pairs per S1 and keeps 99.98% of the true pairs that retrieval finds. Matching stacks two LightGBM
-stages over 62 pair features and two cross-encoders (three, with a bge reranker, for the countries with training
-labels), and a LoRA-tuned 4B reranker judges the unsure records. France has no training labels, so it gets three
-self-training rounds, used only as vetoes, and label-free fixes derived from how the data places decoys at house
+7.37 candidate pairs per S1 and keeps 99.98% of the true pairs that retrieval finds (Table 3.2). Matching stacks two
+LightGBM stages over 62 pair features and two cross-encoders (three, with a bge reranker, for the countries with
+training labels), and a LoRA-tuned 4B reranker judges the unsure records. France has no training labels, so it gets
+three self-training rounds, used only as vetoes, and label-free fixes derived from how the data places decoys at house
 numbers. Last, recall fixes fill S1s left empty and restore no-address records that carry the S1's exact, unique name.
 Macro F0.5 is **0.9930 on US / India validation** and **0.990807 on the public leaderboard**.
 
@@ -46,8 +46,9 @@ We measured these on the provided files (train: US and India; test: US, India an
 1. **Entity context:** stage 2 re-scores each record's best S1 using the other records that claim the same S1 and the
    same house number, so decoys compete with the entity's true cluster.
 2. **A country without labels, handled without hand-written rules:** self-training that can only *remove* matches (an
-   AND-veto), and a label-free "census" of decoy placement that decides same-address records. Both were validated on
-   the labelled countries before use.
+   AND-veto), and a label-free "census" of decoy placement that decides same-address records. The census statistics
+   were validated on the labelled countries before use; the veto, which has no labelled counterpart, was confirmed
+   round by round on the leaderboard (Appendix B).
 3. **The metric rewards recall per entity:** an S1 left empty scores 0 as soon as it has one true match, so an empty
    S1 takes its best candidate above a lower bar (validated on the labelled countries).
 
@@ -63,8 +64,8 @@ Principles that held throughout:
   distractor sits in the fold of the S1 it imitates, so an entity keeps all its decoys.
 - **Nothing is hard-coded to a country.** There are no state tables or word lists. Abbreviations, legal forms and
   word statistics are learned from the provided records, and no external data or services are used.
-- **Every rule is checked on labelled data first.** One rule that looked right on eyeballed test records turned out to
-  reject 99.6%-true matches on validation (Appendix B).
+- **Every rule that can be is checked on labelled data first** (the France-only veto, on the leaderboard). One rule
+  that looked right on eyeballed test records turned out to reject 99.6%-true matches on validation (Appendix B).
 
 ---
 
@@ -109,7 +110,7 @@ set goes unmatched)**
 
 | Blocking | Test pairs per S1 | True pairs kept (val) | Validation F0.5 |
 |---|---|---|---|
-| **P ≥ 0.001 (used)** | **7.36** | **99.98%** | **0.99262** |
+| **P ≥ 0.001 (used)** | **7.37** | **99.98%** | **0.99262** |
 | P ≥ 0.005 | 6.55 | 99.95% | 0.99258 |
 | P ≥ 0.01 | 6.27 | 99.91% | 0.99255 |
 | P ≥ 0.05 | 5.42 | 99.41% | 0.99216 |
@@ -169,8 +170,7 @@ about. We kept P ≥ 0.001.
 | Self-training (countries without labels) | both cross-encoders continued on 3M train pairs + 4M pseudo-labelled test pairs (q ≥ 0.98: best S1 = match, the record's other top-5 = non-match; q ≤ 0.02: no match), then stages 1–2 rerun. Three rounds: round 1 is seeded by stage 2, round k by stage 2 vetoed by rounds < k | the pipeline's own confident test decisions (no labels) |
 | Vetoes | a record of such a country is accepted only if the main stack and the 3 self-trained stacks all pick the same S1, at the lowest of the 4 scores | |
 | Same-address fixes (countries without labels) | label-free census: each S1 gets a roughly fixed number of decoys, normally at one shifted number, so a decoy placed at the S1's *own* address leaves that shifted cluster short. For every word records add at the S1's address, we compare how many of the S1's records sit at other numbers, between those records and unedited ones (total variation distance TV). **True-like** (TV ≤ 0.10): a structurally matching record (same number and sub-number, the S1's distinctive street words, first and rarest core-name word) adding only such words is restored. **Decoy-like** (TV ≥ 0.20): an accepted same-address record adding one is rejected | the test records' own structure. On US / India validation, TV ≤ 0.10 words are 98.7% / 90.8% true and TV ≥ 0.20 words 22.5% true (India) |
-
-| Recall fixes | **Empty S1s:** an S1 with no accepted record takes its best candidate if q ≥ 0.40 (every country; for the countries without labels only if the LLM judge does not say no, since the candidates it rejects there are mostly a type word swapped at the S1's own address). **No-address records (countries without labels):** a rejected record with no address whose normalised name equals its S1's and no other S1's of the country, and that the judge accepts, is restored | US / India validation: the empty-S1 rule +0.00007. No-address records with the S1's exact, unique name: US / India models accept 93–97%, France's 84% (its self-training vetoes learned "no address = reject") |
+| Recall fixes | **Empty S1s:** an S1 with no accepted record takes its best candidate if q ≥ 0.40 (every country; for the countries without labels only if the LLM judge does not say no, since the candidates it rejects there are mostly a type word swapped at the S1's own address). **No-address records (countries without labels):** a rejected record with no address whose normalised name equals its S1's and no other S1's of the country, and that the judge accepts, is restored | US / India validation: the empty-S1 rule +0.00007 at 0.40; every threshold from 0.4 to 0.65 gains when cross-fitted over the two validation folds. No-address records with the S1's exact, unique name: US / India models accept 93–97%, France's 84% (its self-training vetoes learned "no address = reject") |
 
 The same-address fixes and the no-address restores run only where labels are missing. Where labels exist, the models
 already get these records right, and the same-address fixes would cost India 0.0024 (checked with labels).
@@ -178,7 +178,8 @@ already get these records right, and the same-address fixes would cost India 0.0
 **Threshold selection method:** F0.5 optimised on the test-like validation set above (US / India, entity folds 8–9,
 39% distractors, no copies). We accept a record's best S1 when **q ≥ 0.70**, one threshold for every country (flat
 between 0.65 and 0.70). Separate thresholds per bucket (empty address, namesakes, added / dropped word, source,
-singletons) gained +0.00000, and an expected-F0.5 decision per S1 did worse than the plain threshold.
+singletons) gained +0.00000, and an expected-F0.5 decision per S1 gained +0.00004 over the plain threshold
+(cross-fitted) but did worse than the threshold plus the empty-S1 rule.
 
 ---
 
@@ -198,6 +199,9 @@ singletons) gained +0.00000, and an expected-F0.5 decision per S1 did worse than
 | Missed true match (false negative) | 8,829 | +0.00208 | 75% | 78% |
 | Accepted distractor (false positive) | 524 | +0.00054 | 46% | 49% |
 | Accepted the wrong S1 (false positive) | 741 | +0.00044 | 72% | 67% |
+
+The table counts stage-2 rows only (each record's own best S1). True pairs whose S1 was never retrieved (0.58% of true
+pairs) or lost to another S1 as the record's best (0.84%) are not in it.
 
 - **Common false positives (wrong merges):**
     - **The wrong namesake.** A record with no address whose name exists for several S1s is given to the wrong one,
@@ -227,7 +231,8 @@ singletons) gained +0.00000, and an expected-F0.5 decision per S1 did worse than
       bge stack for US / India, the leaderboard rose from 0.990349 to **0.990807**.
 
 The largest remaining loss (+0.00208) is information-limited: the missing address cannot be recovered, and per-bucket
-thresholds did not help. For scale, an oracle over all three error types gives about 0.9957.
+thresholds did not help. For scale, fixing all three error types in the table gives about 0.9957; that is not an
+upper bound on the score, since the retrieval and wrong-best-S1 misses above are outside the table.
 
 ---
 
@@ -306,7 +311,7 @@ AMLC_ROOT=/folder/with/student_resource GPU_A=0 GPU_B=1 GPU_C=2 bash reproduce.s
 
 ¹ With duplicated distractors (inflated). ² The harder validation set (each distractor in its S1's fold).
 
-From v9p to the submitted file the leaderboard rose by +0.0077 while US / India validation barely moved, so nearly all
+From v9p to the submitted file the leaderboard rose by +0.0081 while US / India validation barely moved, so nearly all
 of it came from France. France is 15% of the S1s, so a France-only change of Δ on the leaderboard is Δ / 0.15 on France.
 
 **Tried and dropped** (measured):
@@ -324,7 +329,8 @@ of it came from France. France is 15% of the S1s, so a France-only change of Δ 
   have a namesake S1 that differs only in the legal form, so a hand review found them ~60% right, below the ~75% an
   added record needs under F0.5.
 - A smaller candidate set for the countries with labels (shortlist P ≥ 0.005 there): −5.8% pairs for −0.00002
-  validation, i.e. no measurable cost, but it needs a per-country cut and a second retrain for no score gain.
+  validation, i.e. no measurable cost. The organisers rank a smaller candidate set higher, but it needs a per-country
+  cut and a second retrain of the labelled countries' stack, and it did not fit in the time left.
 - A zero-shot 7B LLM judge (AUC 0.59 on unsure pairs); the LoRA fine-tune is what makes the judge work (AUC 0.84, and
   complementary to stage 2's 0.94).
 - Continuing the LLM on France pseudo-labels: it copied the vetoes' decisions.
