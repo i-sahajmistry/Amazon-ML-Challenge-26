@@ -3,7 +3,7 @@
 Newest first. Each entry: what was measured, the number, what it means. LB = public leaderboard; "val" = US/India
 validation (entity folds 8-9, distractors weighted to the test share of 39%, copy-free).
 
-## Current status for the team (read this first; updated 2026-09-27 10:35 IST)
+## Current status for the team (read this first; updated 2026-09-27 11:50 IST)
 - **Best leaderboard: `variant_v10seed_dd`, 0.990349** (dd 0.990282, v10_fr3_llm 0.987071). File: Sahaj's PC
   `submissions/variant_v10seed_dd/`, padum `~/scratch/amlc_variant/output_variant_dd/`; matching_results md5 e73c409e,
   candidate_pairs md5 1a8b4f5c (= dd's: 12,760,925 pairs, 7.37 per S1); validator --check-ids PASS.
@@ -14,17 +14,34 @@ validation (entity folds 8-9, distractors weighted to the test share of 39%, cop
 - **Clean code: branch `final-dd`**: only the modules and `reproduce.sh` that build dd (0.990282) from the provided
   zip; no country names (countries without training labels are found from the data); seeds set. Its last steps
   rebuild dd byte for byte from the original run's q files (entry 04:45).
-- **Reproducibility check, running** (padum `~/scratch/amlc_final`: final-dd a707292 from an empty work/, ETA ~12:00):
-  every stage so far within 0.0001 validation F0.5 of the original (v8 0.99235 / 0.99234, v9p 0.99278 / 0.99277, v10
-  0.99261 / 0.99262, judge 0.99299 / 0.99297); retrieval recall equal; the shortlist keeps ~4% more pairs. GPU
-  training is not bit-exact, so the file will agree closely, not byte for byte. Left: round 3, the judge on test, the
-  stack, the France fixes, validator, comparison with the submitted dd.
+- **Reproducibility check: done** (entry 11:50). `final-dd` rebuilt dd from an empty work/ in 8.5 h: validation
+  equal at every stage, validator PASS, 98.9% of S1 rows identical to the submitted file (F0.5 0.9978 against it),
+  candidate set 7.72 per S1 (submitted 7.37). GPU training is not bit-exact, so it matches closely, not byte for
+  byte. HEAD's country-free last steps give the rerun's file byte for byte.
 - **Candidate set** (the organisers now rank a smaller candidate_pairs.tsv higher): 7.37 pairs per S1. A tighter
   shortlist (6.27 per S1) loses France matches (entry 10:10, `tight_dd`), so it is not used.
 - **Open:** (1) is `variant_v10seed_dd` the final file? (2) If so, `final-dd` should build it: the variant's steps in
   `reproduce.sh` instead of the v9s / v9s2 / v10s3 rounds, checked on the rerun's v10 files (~4-5 h on one GPU).
 - **Before the final submission:** checklist in [SUBMISSION_NOTES.md](SUBMISSION_NOTES.md) (what goes in the zip, what
   must stay out: architecture.md and review/ are on v11 for the team only).
+
+## 2026-09-27 11:50 — end-to-end rerun of `final-dd` done: dd reproduced (not byte for byte); HEAD's last steps identical
+- **Rerun** (padum `~/scratch/amlc_final`, code a707292, empty work/, 03:03-11:34 on two to three A100s): dd md5
+  b0caba6a, candidate_pairs 66ba41e6; validator --check-ids PASS (absolute paths).
+- **vs the submitted dd** (75f68b10): S1 rows identical 98.88% (US 99.03%, India 99.19%, France 97.57%); pairs
+  5,870,159 vs 5,868,945; the rerun scored against the submitted file 0.99776 (US 0.99793, India 0.99841, France
+  0.99527). v10_fr3_llm: 98.50% identical, 0.99703. Validation: LLM blend 0.99281 vs 0.99282, every stage within
+  0.0001 (checkpoints 1-11 below). France: restore 33,459 / reject 11,632 (32,439 / 11,655), accepted 858,796
+  (859,649), structural rule accepts 677,673 (677,843).
+- **Candidate set 7.72 per S1** (13,377,149 pairs; submitted 7.37, +4.8%): the retrained bi-encoder and shortlist
+  model calibrate P a little differently at the same P >= 0.001.
+- **HEAD 187946d's last steps** (unlabelled() + x_ddfix instead of x_rule1 + x_wordlists; `~/scratch/amlc_head_rerun`)
+  on the rerun's q files: matching_results b0caba6a and v10_fr3_llm 409043f2, **byte-identical** to the rerun's;
+  restore / reject 33,459 / 11,632. The pushed branch is what was reproduced.
+- Read: reproducible statistically, not byte for byte. 1.1% of S1 rows differ, mostly France (2.4%), where the veto
+  chain and the fixes amplify small score changes; for scale, the variant differed from dd on 0.37% of rows and moved
+  the LB by +0.00007. The zip carries the submitted file's own candidate_pairs.tsv; the README should say a rerun
+  gives about 7.7 pairs per S1.
 
 ## 2026-09-27 10:35 — `variant_v10seed_dd` leaderboard 0.990349 (dd 0.990282, +0.000067): new best
 - The spare probe (entry 09:50). Two changes against dd: the three France rounds seeded from v10 / v10+a1 /
