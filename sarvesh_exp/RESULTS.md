@@ -1,0 +1,33 @@
+# Experiments on top of the best file (Sarvesh, 27 Sep)
+
+Not part of the submission package (this folder is outside `ber/`). Scripts here are exactly what ran on padum.
+
+## Baseline
+**`variant_v10seed_dd`, leaderboard 0.990349** (Sahaj; `~aib262144/amlc_variant/output_variant_dd/`, matching_results md5
+`e73c409e`, candidate_pairs `1a8b4f5c`). US / India validation 0.99282.
+Accepted matches: US 2,255,158, India 2,751,010, France 859,338.
+
+All experiments are **CPU assembly** (`x_final.py` of `final-dd` HEAD, generic: `unlabelled:` = countries without
+training labels) from Sahaj's finished q files, read-only. Every file keeps candidate_pairs `1a8b4f5c` (same 12.76M
+pairs) and passes the validator with `--check-ids`. Outputs: padum `/scratch/scai/mtech/aib262045/amlc_exp/out_<name>/`.
+
+**How to judge:** US / India have labels, so a US / India change has a validation score. France has none, so a France
+change can only be judged on the leaderboard; for those we report how many France matches change.
+
+## Results
+
+| # | What changes (vs baseline) | US / India / France accepted | matching md5 | Evidence | Verdict |
+|---|---|---|---|---|---|
+| E0 | nothing: the variant rebuilt from its files with the generic x_final | 2,255,158 / 2,751,010 / 859,338 | `e73c409e` | byte-identical to the 0.990349 file | ✅ setup correct; generic assembly reproduces the best file exactly |
+| E1 | US / India from the bge stack (v10b + LLM, `_v10bplw`); France unchanged | 2,255,799 / 2,751,628 / 859,338 | `ab07d90e` | bge stack +0.00011–0.00016 US/India validation | ✅ likely +0.0001 LB |
+| E1b | as E1 with the bge + LLM round-2 stack (`_v10bpl2w`) | 2,255,859 / 2,751,539 / 859,338 | `34173047` | ≈ E1 | ≈ E1 |
+| E2 | E1 + the bge stack as a 4th France veto | … / … / 855,682 (−3,656) | `7a35ceb9` | none (France) | ❓ LB only; vetoes have helped before |
+| E3 | E1, France base from bge + LLM round 2 | … / … / 856,838 (−2,500) | pending | none (France) | ❓ LB only |
+| E4a / E4b | E1, France threshold 0.65 / 0.75 | pending | | none (France) | ❓ LB only |
+| E5 | E1 with the generic France fixes (`rule_fr` + `x_ddfix`) instead of the variant's lists | pending | | compares generic vs variant lists | compliance check |
+| E7 | US / India from the mean of the bge and main stacks | pending | | US / India validation | pending |
+
+## Earlier: candidate-set size (`cand_trim.py`, on the v9 shortlist = the same 12.76M pairs)
+Raising the shortlist cut-off from P ≥ 0.001: 0.003 → −8% pairs, cuts 782 of 5.88M accepted matches; 0.005 → −11%,
+1,421; France 10.1 → 8.2 / 7.5 pairs per S1. Needs a full rerun from stage 1 (candidate_pairs must be what the model
+scored). Sahaj's `tight_dd` (6.27 per S1) lost France matches, so a tighter shortlist is not used.

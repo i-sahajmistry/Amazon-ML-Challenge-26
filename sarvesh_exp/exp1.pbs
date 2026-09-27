@@ -1,0 +1,39 @@
+#!/bin/bash
+#PBS -N exp_variant
+#PBS -P scai
+#PBS -q scai_q
+#PBS -l select=1:ncpus=4:ngpus=1:mem=120gb
+#PBS -l walltime=01:30:00
+# Assembly experiments on top of variant_v10seed_dd (LB 0.990349), from Sahaj's finished files (read-only links), with
+# final-dd HEAD's x_final (generic). CPU only.
+#  E0  the variant rebuilt from its files (must equal md5 e73c409e)
+#  E1  US / India from the bge stack (v10b + LLM, _v10bplw); France exactly as the variant
+#  E1b same with the bge + LLM2 stack (_v10bpl2w) for US / India
+PY=$HOME/scratch/miniconda3/envs/amlc312/bin/python
+R=/scratch/scai/mtech/aib262045/amlc_exp; X=$R/work/x
+V=/scratch/scai/mtech/aib262144/amlc_variant/work/x; O=/scratch/scai/mtech/aib262144/AmazonMLChallenge/work
+REF=/scratch/scai/mtech/aib262144/amlc_variant/output_variant_dd/matching_results.tsv
+mkdir -p $X
+ln -sfn $HOME/scratch/amlc_data/student_resource $R/student_resource
+for f in pq lexicon.json; do [ -e $R/work/$f ] || ln -s $O/$f $R/work/$f; done
+for f in test_q_a1pw test_q_a2pw test_q_a3pw test_q_v10plw restore_fr_dd reject_fr_dd; do ln -sfn $V/$f.parquet $X/$f.parquet; done
+ln -sfn $O/x/p5_test_v10.parquet $X/p5_test_v10plw.parquet
+for f in test_q_v10bplw test_q_v10bpl2w; do ln -sfn $O/x/$f.parquet $X/$f.parquet; done
+ln -sfn $O/x/p5_test_v10b.parquet $X/p5_test_v10bplw.parquet; ln -sfn $O/x/p5_test_v10b.parquet $X/p5_test_v10bpl2w.parquet
+cp -n /scratch/scai/mtech/aib262144/amlc_final/compare.py $R/compare.py
+export AMLC_ROOT=$R OMP_NUM_THREADS=4
+cd $HOME/scratch/ber_gen_code/ber/src
+VETO=unlabelled:_a1pw:min,unlabelled:_a2pw:min,unlabelled:_a3pw:min
+run() {   # run NAME BASE FROM
+  echo "===== $1: base $2, FROM $3"
+  FROM=$3 RESTORE=restore_fr_dd REJECT=reject_fr_dd $PY -u x_final.py $R/out_$1 $2 0.70 2>&1 | grep -E "^thr|restore|reject"
+  (cd $R/student_resource && $PY utils/validate_submission.py --check-ids --test-dir dataset/test \
+     --matching $R/out_$1/matching_results.tsv --candidate $R/out_$1/candidate_pairs.tsv 2>&1 | grep -E "PASS|FAIL|WARN|issue")
+  md5sum $R/out_$1/*.tsv
+  (cd $R && $PY compare.py $R/out_$1/matching_results.tsv $REF 2>&1 | tail -6)
+}
+run E0 _v10plw $VETO
+run E1 _v10bplw "unlabelled:_v10plw,$VETO"
+run E1b _v10bpl2w "unlabelled:_v10plw,$VETO"
+echo "reference variant md5: $(md5sum $REF | cut -c1-32)"
+echo "done $(date +%T)"

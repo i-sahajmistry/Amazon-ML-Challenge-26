@@ -1,0 +1,37 @@
+#!/bin/bash
+#PBS -N exp_variant2
+#PBS -P scai
+#PBS -q scai_q
+#PBS -l select=1:ncpus=4:ngpus=1:mem=150gb
+#PBS -l walltime=02:00:00
+# Batch 2 on top of variant_v10seed_dd (0.990349) / E1 (variant + bge US/India). CPU only, final-dd HEAD code.
+PY=$HOME/scratch/miniconda3/envs/amlc312/bin/python
+R=/scratch/scai/mtech/aib262045/amlc_exp; X=$R/work/x
+V=/scratch/scai/mtech/aib262144/amlc_variant/work/x; O=/scratch/scai/mtech/aib262144/AmazonMLChallenge/work
+REF=/scratch/scai/mtech/aib262144/amlc_variant/output_variant_dd/matching_results.tsv
+for f in test_q_v10fr3l; do ln -sfn $V/$f.parquet $X/$f.parquet; done
+ln -sfn $O/x/wstat_words_test_France_0.parquet $X/wstat_words_test_France_0.parquet
+export AMLC_ROOT=$R OMP_NUM_THREADS=4 PYTHONPATH=$HOME/scratch/ber_gen_code/ber/src
+cd $HOME/scratch/ber_gen_code/ber/src
+VETO=unlabelled:_a1pw:min,unlabelled:_a2pw:min,unlabelled:_a3pw:min
+run() {   # run NAME BASE FROM [extra env...]
+  local n=$1 b=$2 f=$3; shift 3
+  echo "===== $n: base $b, FROM $f $*"
+  env "$@" FROM=$f $PY -u x_final.py $R/out_$n $b 0.70 2>&1 | grep -E "^thr|restore|reject"
+  (cd $R/student_resource && $PY utils/validate_submission.py --check-ids --test-dir dataset/test \
+     --matching $R/out_$n/matching_results.tsv --candidate $R/out_$n/candidate_pairs.tsv 2>&1 | grep -E "PASS|FAIL")
+  md5sum $R/out_$n/matching_results.tsv
+}
+L="RESTORE=restore_fr_dd REJECT=reject_fr_dd"
+run E2  _v10bplw "unlabelled:_v10plw,$VETO,unlabelled:_v10bplw:min" $L
+run E3  _v10bplw "unlabelled:_v10bpl2w,$VETO" $L
+run E4a _v10bplw "unlabelled:_v10plw,$VETO" $L THR_C=unlabelled:0.65
+run E4b _v10bplw "unlabelled:_v10plw,$VETO" $L THR_C=unlabelled:0.75
+echo "===== E5: generic France fixes (rule_fr + x_ddfix) on the variant's combined q"
+$PY -u wstat.py test > $R/wstat.log 2>&1 || echo "wstat failed (using the linked word statistic)"
+$PY -u rule_fr.py _v10plw 2>&1 | tail -2
+$PY -u x_ddfix.py _v10plw _v10fr3l 2>&1 | grep -E "rows|restore|reject|wrote" | head -5
+run E5  _v10bplw "unlabelled:_v10plw,$VETO" RESTORE=restore_dd REJECT=reject_dd
+echo "===== per-country comparison against the variant (0.990349)"
+for n in E1 E2 E3 E4a E4b E5; do echo "--- $n"; (cd $R && $PY $HOME/scratch/amlc_exp/compare.py $R/out_$n/matching_results.tsv $REF 2>&1 | tail -5); done
+echo "done $(date +%T)"
