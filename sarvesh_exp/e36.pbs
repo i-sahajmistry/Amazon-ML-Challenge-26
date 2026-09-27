@@ -1,0 +1,25 @@
+#!/bin/bash
+#PBS -N exp_e36
+#PBS -P scai
+#PBS -q scai_q
+#PBS -l select=1:ncpus=4:ngpus=1:mem=180gb
+#PBS -l walltime=01:30:00
+# E36: stage 2 (+ LLM blend) with 5 name-ambiguity features, reusing the E10 control's stage 1 (all pairs).
+# Control: stage 2 0.70 0.99274, + LLM 0.70 0.99289.
+PY=$HOME/scratch/miniconda3/envs/amlc312/bin/python
+C=/scratch/scai/mtech/aib262045/amlc_e10_0.001; R=/scratch/scai/mtech/aib262045/amlc_e36; CODE=$HOME/scratch/ber_e36
+rm -rf $CODE; cp -r $HOME/scratch/ber_gen_code $CODE
+sed -i 's/"ed_add", "ed_del", "ed_swap_sim", "ed_add_susp", "ed_add_df", "ed_del_df"\]/"ed_add", "ed_del", "ed_swap_sim", "ed_add_susp", "ed_add_df", "ed_del_df", "z_amb_rec", "z_amb_s1", "z_na_empty", "z_invented", "z_cn_eq"]/' $CODE/ber/src/x_feats.py
+grep -c z_amb_rec $CODE/ber/src/x_feats.py
+mkdir -p $R/work/x; ln -sfn $C/student_resource $R/student_resource
+for f in $C/work/*; do [ "$(basename $f)" = x ] || ln -sfn $(readlink -f $f) $R/work/$(basename $f); done
+for f in $C/work/x/*; do case $(basename $f) in extra_*|gbm5s2*|val_q*|test_q*|p5_test_v10bp*) ;; *) ln -sfn $(readlink -f $f) $R/work/x/$(basename $f);; esac; done
+export PYTHONPATH=$CODE/ber/src OMP_NUM_THREADS=8 NT=8 AMLC_ROOT=$R DFOLD=1
+cd $CODE/ber/src
+echo "== feats $(date +%T)"; $PY -u $HOME/scratch/exp/e36_feats.py $C || exit 1
+echo "== stage 2 $(date +%T)"
+CE_TAGS=_n10,_r10,_b10 TAG=_v10b BAG=5 PEERS=1 $PY -u x_nocopy.py test > $R/s2.log 2>&1 || { tail -20 $R/s2.log; exit 1; }
+grep -E "weighted-trained, copy-free" $R/s2.log
+echo "== LLM blend $(date +%T)"; $PY -u x_llmstack.py _v10bp _v10bp > $R/llm.log 2>&1 || { tail -20 $R/llm.log; exit 1; }
+grep -E "stage-2 .*LLM" $R/llm.log
+echo "done $(date +%T)"

@@ -21,7 +21,18 @@ E12), lone-match drop (E13b), sibling rule (E15), stage-2 tuning bigger trees / 
 (E20, worse than the simple rescue), second-model veto on US / India (E25), exact / fuzzy name rules for name-only
 records (E26 / E28: their misses are ambiguous, not fixable), house-number rules for US / India (E23: accepted test
 pairs already look like true matches). Invented-name records → match by address (E33: −0.00007; those records are
-already found 97.8% of the time, the extra address matches are only 67% right). Do not chase a "France recall gap" (E21 / E22: France just has smaller clusters).
+already found 97.8% of the time, the extra address matches are only 67% right). Do not chase a "France recall gap" (E21 / E22: France just has smaller clusters). Per-record-type thresholds (E34: −0.00004, every
+type already calibrated). Name-ambiguity / invented-name features in stage 2 (E36: + LLM 0.99289 = control 0.99289).
+Richer judge blend with record-type features, LR or LightGBM (E38: −0.00000 … −0.00004; the 2-input LR is best).
+"France over-accepts decoys" (E39: France rejects 2.18 claimants per S1 vs US 2.13 / India 2.16 — no excess).
+
+**France evidence (label-free, E37 / E39 / E40 on test):** US / India test acceptance matches train truth kind-for-kind
+(e.g. other-address same-name 0.969 vs 0.970 per S1; number-shift name-edit 0.238 vs 0.238), so their models are
+calibrated. France is much stricter on number-mismatched records: *same name, record number LOWER than the S1's*
+accepted 35% in France vs 85% US / 89% India (validation: 73% / 81% true, accepted 89% / 93% at 99.95% precision);
+*different name, lower number* 4% vs 51% / 41%; *same name, number up > 13* 21% vs 50% / 87%. Caveat: France has fewer
+such rows per S1 (0.18 vs 0.41), so part of this may be real. Decoys shift UP 1–13 and come in groups at one
+number; E41 tests "same name + lower number + alone at that number" and builds upload-ready files.
 
 ## FOR THE FINAL BUILD — read this first (kept current)
 Written for whoever builds the final file (team or their assistant). Baseline = `variant_v10seed_dd`, LB 0.990349,
