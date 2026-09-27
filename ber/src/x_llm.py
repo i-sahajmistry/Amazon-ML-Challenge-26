@@ -19,7 +19,7 @@ from harness import truth_arrays, wscore
 
 XD = f"{WORK}/x"
 QT = os.environ.get("QT", "_v9p")
-BASE = os.environ.get("LLM", "/scratch/scai/mtech/aib262144/models/qwen3-reranker-4b")
+BASE = os.environ.get("LLM", "Qwen/Qwen3-Reranker-4B")   # Apache-2.0; set LLM=/local/path on offline nodes
 OUTD = os.environ.get("LLM_DIR", f"{XD}/llm_lora")
 LT = os.environ.get("LLM_TAG", "")
 INIT = os.environ.get("LLM_INIT", "")        # an adapter to continue instead of a fresh LoRA
