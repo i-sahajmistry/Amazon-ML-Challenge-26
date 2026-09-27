@@ -64,8 +64,14 @@ md5 e73c409e. Each item: what, evidence, how to apply, decision rule. Details an
     **`eb6fdbec`**; validator `--check-ids` **PASS**; France byte-identical to the variant. vs E16: 99.6% of S1 rows
     identical (the retrain moves ~3.5k pairs each way, F0.5 0.9992 between them) — same validation.
     **Choose E17 over E16 if the smaller candidate file counts; otherwise they are equivalent.**
-14. **RUNNING — stage-2 tuning (E18, `s2tune.pbs`)** on the E10 control's stage 1 (control + LLM 0.70 = 0.99289):
-    `lr` = learning rate 0.05 → 0.025 with BAG 10; `big` = 127 leaves, min_data_in_leaf 200, BAG 5.
+14. **Stage-2 tuning (E18, `s2tune.pbs`)** on the E10 control's stage 1 (control + LLM 0.70 = 0.99289):
+    - **DO NOT APPLY — `big`** (127 leaves, min_data_in_leaf 200, BAG 5): stage 2 0.70 0.99276 vs 0.99274, + LLM
+      0.70 **0.99289 = control 0.99289**; logloss worse (0.00817–0.00819 vs 0.00812–0.00815). No gain.
+    - RUNNING — `lr` (learning rate 0.05 → 0.025, BAG 10): early logloss better (0.00810 vs 0.00813).
+15. **LEADERBOARD BET — E19 = E17 + E2** (`exp11.pbs`, building): US / India as E17, France as E2 (bge + LLM stack
+    as a 4th France min-veto). Final ranking = private score of the best public submission, so a worse upload costs
+    only the slot. Top 3 is 0.99117 (+0.00082 over us); validated changes give ≈ +0.0002, so a France change is the
+    only lever big enough to matter.
 
 
 Not part of the submission package (this folder is outside `ber/`). Scripts here are exactly what ran on padum.

@@ -1,0 +1,23 @@
+#!/bin/bash
+#PBS -N exp_e19
+#PBS -P scai
+#PBS -q scai_q
+#PBS -l select=1:ncpus=1:ngpus=1:mem=80gb
+#PBS -l walltime=00:40:00
+# E19 = E17 (US / India: bge + LLM on the smaller candidate set + empty-S1 rescue) + E2 (France: the variant's chain
+# with Sahaj's bge + LLM stack as a 4th min-veto). France must equal E2's France, US / India must equal E17's.
+PY=$HOME/scratch/miniconda3/envs/amlc312/bin/python
+R=/scratch/scai/mtech/aib262045/amlc_e10_0.005; X=$R/work/x; E=/scratch/scai/mtech/aib262045/amlc_exp
+REF=/scratch/scai/mtech/aib262144/amlc_variant/output_variant_dd/matching_results.tsv
+export AMLC_ROOT=$R OMP_NUM_THREADS=1 PYTHONPATH=$HOME/scratch/ber_gen_code/ber/src
+ln -sfn /scratch/scai/mtech/aib262144/AmazonMLChallenge/work/x/test_q_v10bplw.parquet $X/test_q_v10bplwS.parquet
+cd $HOME/scratch/ber_gen_code/ber/src
+echo "===== E19: E17 + E2 (bge as a 4th France veto)"
+FROM=unlabelled:_v10plw,unlabelled:_a1pw:min,unlabelled:_a2pw:min,unlabelled:_a3pw:min,unlabelled:_v10bplwS:min RESTORE=restore_fr_dd REJECT=reject_fr_dd \
+  $PY -u x_final.py $E/out_E19 _resc17 0.70 2>&1 | grep -E "^thr|restore|reject|Error|Traceback"
+(cd $E/student_resource && $PY utils/validate_submission.py --check-ids --test-dir dataset/test --matching $E/out_E19/matching_results.tsv --candidate $E/out_E19/candidate_pairs.tsv 2>&1 | grep -E "PASS|FAIL|rror")
+md5sum $E/out_E19/*.tsv
+echo "--- vs E17 (US / India must be identical)"; (cd $E && $PY compare.py $E/out_E19/matching_results.tsv $E/out_E17/matching_results.tsv 2>&1 | tail -4)
+echo "--- vs E2 (France must be identical)";     (cd $E && $PY compare.py $E/out_E19/matching_results.tsv $E/out_E2/matching_results.tsv 2>&1 | tail -4)
+echo "--- vs variant";                           (cd $E && $PY compare.py $E/out_E19/matching_results.tsv $REF 2>&1 | tail -4)
+echo "done $(date +%T)"
