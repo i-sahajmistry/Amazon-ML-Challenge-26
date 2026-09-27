@@ -1,0 +1,14 @@
+#!/bin/bash
+#PBS -N cand_p
+#PBS -P scai
+#PBS -q scai_q
+#PBS -l select=1:ncpus=8:ngpus=1:mem=300gb
+#PBS -l walltime=02:30:00
+# E10 step 1: shortlist probability for every scored pair (train + test), saved in feats2 row order.
+PY=$HOME/scratch/miniconda3/envs/amlc312/bin/python
+R=/scratch/scai/mtech/aib262045/amlc_exp; O=/scratch/scai/mtech/aib262144/AmazonMLChallenge/work
+for f in cand_train.parquet cand_test.parquet feats2_train.parquet feats2_test.parquet shortlist_text.txt; do [ -e $R/work/$f ] || ln -s $O/$f $R/work/$f; done
+export AMLC_ROOT=$R NT=8 OMP_NUM_THREADS=8 PYTHONPATH=$HOME/scratch/ber_gen_code/ber/src
+cd $HOME/scratch/ber_gen_code/ber/src
+$PY -u $HOME/scratch/exp/cand_p.py
+echo "done $(date +%T)"

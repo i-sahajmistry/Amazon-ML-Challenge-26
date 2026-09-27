@@ -42,6 +42,14 @@ change can only be judged on the leaderboard; for those we report how many Franc
 - With the LLM blend (Sahaj's `x_llmstack__v10bp__v10bp.log`): bge + LLM **0.99294** at 0.70 (0.60 0.99289, 0.65 0.99291,
   0.75 0.99290, 0.80 0.99282); the variant's main + LLM stack 0.99282. So E1's US/India gain is +0.00012.
 
+## E10 (running): smaller candidate set for the countries with labels
+The organisers rank a smaller candidate_pairs.tsv higher, and it must be exactly what the first model scored, so a
+smaller set means re-scoring. Plan: keep France's list (its namesake competition matters; Sahaj's `tight_dd` lost
+France matches), raise the shortlist cut-off for US / India only (P ≥ 0.003 / 0.005), re-run stage 1 → stage 2 → LLM
+blend on the smaller set, and measure the US / India validation cost against the pairs saved.
+- Step 1 (`cand_p.py`): the shortlist probability of every scored pair, train + test → `x/shortP_{split}.npy`.
+- Expected from `cand_trim.py`: at 0.005, US 6.58 → 6.29 and India 7.14 → 6.46 pairs per S1 (≈ −0.7M pairs, −5.5%).
+
 ## Earlier: candidate-set size (`cand_trim.py`, on the v9 shortlist = the same 12.76M pairs)
 Raising the shortlist cut-off from P ≥ 0.001: 0.003 → −8% pairs, cuts 782 of 5.88M accepted matches; 0.005 → −11%,
 1,421; France 10.1 → 8.2 / 7.5 pairs per S1. Needs a full rerun from stage 1 (candidate_pairs must be what the model
