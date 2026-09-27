@@ -26,7 +26,14 @@ md5 e73c409e. Each item: what, evidence, how to apply, decision rule. Details an
    0.625 0.99223 = 0.70 0.99223; India best 0.675 0.99375 vs 0.70 0.99374). Keep 0.70 for every country.
 7. **OPTIONAL, LEADERBOARD-ONLY — E9: France base from the bge + LLM stack** (same 3 vetoes and fixes): France 857,002
    (−2,336), md5 ae0ecb86, PASS.
-8. **PENDING:** E10 (smaller candidate set for US / India, validated) — step 1 running.
+8. **KEY FINDING (E11) — why US / India score lower on the leaderboard than on validation:** test has ~3× more
+   *sparse* S1s (claimed by only 1–4 records: 27% of test S1s vs 8% of validation), and the model is weakest exactly
+   there (validation F0.5 0.958–0.988 vs 0.994–0.995 for S1s with 6+ claimants). Reweighting validation to test's
+   claimant mix: US+India 0.99283 → **0.98893** (US 0.99223 → 0.98581, India 0.99374 → 0.99171). Right direction and
+   enough to explain the ~0.001 gap (it overshoots, likely because validation distractors were counted with their
+   weight). Lead: sparse S1s prefer a lower threshold (0.5: +0.0013 / +0.0016 within the 2- and 4-claimant groups).
+   E12 (running) tests a claimant-count threshold cross-fitted on validation.
+9. **PENDING:** E10 (smaller candidate set for US / India, validated) — step 1 running.
 
 
 Not part of the submission package (this folder is outside `ber/`). Scripts here are exactly what ran on padum.
@@ -73,6 +80,24 @@ From the team's `compare.py` (pairs = accepted record → S1 links).
 
 F0.5 break-even for a France removal: it helps if the removed pairs are more than ~30% wrong (precision-weighted metric);
 past France vetoes removed mostly decoys. Additions help only if they are more than ~70% right.
+
+## E11: validation vs test, by how many records claim each S1 (`exp5.py`)
+Claimants = records whose best S1 it is (label-free, exists on test). Validation counts distractors with their weight.
+
+| claimants | US val / test share | US val F0.5 | India val / test share | India val F0.5 |
+|---|---|---|---|---|
+| 1 | 0.0003 / 0.0090 | 0.97222 | 0.0028 / 0.0102 | 0.97032 |
+| 2 | 0.0010 / 0.0324 | 0.97725 | 0.0102 / 0.0329 | 0.98932 |
+| 3 | 0.0160 / 0.0794 | 0.93624 | 0.0307 / 0.0784 | 0.97526 |
+| 4 | 0.0503 / 0.1557 | 0.97794 | 0.0564 / 0.1494 | 0.98808 |
+| 5 | 0.1597 / 0.2186 | 0.99111 | 0.1528 / 0.2073 | 0.99293 |
+| 6 | 0.2674 / 0.2106 | 0.99428 | 0.2451 / 0.2058 | 0.99530 |
+| 7 | 0.2108 / 0.1523 | 0.99472 | 0.1934 / 0.1546 | 0.99570 |
+| 8+ | 0.2944 / 0.1420 | 0.99473 | 0.3070 / 0.1609 | 0.99509 |
+| **all** | validation **0.99223** → test-like **0.98581** | | validation **0.99374** → test-like **0.99171** | |
+
+Best threshold per group (US+India validation): 2 claimants 0.5 (+0.00132), 3: 0.5 (+0.00008), 4: 0.5 (+0.00157),
+5: 0.6 (+0.00012), 6–7: 0.7 (0), 8+: 0.8 (+0.00010). In-sample; E12 cross-fits it.
 
 ## US / India validation (labels; entity folds 8-9, distractors weighted, copy-free), `exp3.py`
 
