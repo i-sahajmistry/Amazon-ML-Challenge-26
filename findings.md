@@ -3,17 +3,132 @@
 Newest first. Each entry: what was measured, the number, what it means. LB = public leaderboard; "val" = US/India
 validation (entity folds 8-9, distractors weighted to the test share of 39%, copy-free).
 
-## Current status for the team (read this first; updated 2026-09-27 15:50 IST)
-- **Final file: E16fr3, leaderboard 0.990807** (new best; variant 0.990349; top 0.991811). `submissions/E16fr3/`:
-  matching_results e93605ad, candidate_pairs 1a8b4f5c. E1 (bge stack for US / India) + empty-S1 rescue + France
-  exact-name no-address restores + France rescue without the judge's "no" (entries 15:05 / 15:40 / 16:00).
-- **Code: final-dd d7db51d (pushed)** builds this method (bge lane, `x_recall.py`); README, documentation and figure
-  updated. **Package** `submission/SSM_submission.zip` rebuilt 15:46 with E16fr3's files; validator PASS.
+## Current status for the team (read this first; updated 2026-09-27 20:45 IST)
+- **Final file: C4, leaderboard 0.99084** (new best; E16fr3 0.990807; top ~0.992). `submissions/C4/`: matching_results
+  7c929413, candidate_pairs 1a8b4f5c. E16fr3 + four France recall lists for vetoed records of kinds the labelled
+  countries show are true (entries 20:30 / 20:45). It is the last upload.
+- **Code: final-dd 579db0d (pushed)** builds it (`x_recall.py`, `x_llm.py rows`, `reproduce.sh`); README,
+  documentation and figure updated. **Package** `submission/SSM_submission.zip` rebuilt 20:40 with C4's files;
+  validator PASS, audited.
 - The padum v10-only check (entry 15:05) is the reproducibility evidence; the bge chain on its files is running
   (`~/scratch/amlc_v10only/bge.sh`) to rebuild E16fr3's method from the clean code as well.
 - **Reproducibility:** a from-scratch rerun of dd matched every stage's validation within 0.0001 and 98.9% of S1 rows
   (entry 11:50); GPU training is not bit-exact.
 - **Before the final submission:** checklist in [SUBMISSION_NOTES.md](SUBMISSION_NOTES.md).
+
+## 2026-09-27 20:45 — LB: C4 = 0.99084 (+0.000033 over E16fr3): new best, the final file; C5 not worth an upload
+- **C4 0.99084** vs E16fr3 0.990807: +0.000033, the low end of the expected range (0.99084-0.99096). By the per-S1
+  model that is ~70-75% of the 2,916 France restores right, where my hand review said ~93% and US / India labels
+  95-100% for the same kinds: France has a distractor type in these kinds that neither the labels of other countries
+  nor a read of the records shows. More rules of this family are a coin flip.
+- **Final file = C4** (last upload; matching 7c929413, candidate_pairs 1a8b4f5c). final-dd **579db0d** (pushed) builds
+  it: `x_recall.py` (four lists), `x_llm.py rows`, `reproduce.sh`; README, documentation and figure updated. Zip
+  rebuilt 20:40 from a clean `git archive` of 579db0d: `submission/SSM_submission.zip` (122 MB), validator --check-ids
+  PASS, output = C4 byte for byte, x_recall.py = the one that built C4, no CR bytes, no cluster paths, no notes.
+- **C5** (padum `~/scratch/amlc_c5/output_C5`, matching 75179abd, PASS): C4 + initials at the S1's exact address
+  even where the main model rejected them. With the rule's conditions (only S1 there, exact street, the record's best
+  S1) it adds only **52** France records (restore_exact 161 → 217): ~+0.000003, not worth the last upload.
+
+## 2026-09-27 20:30 — C4: the sound parts of Mohanish's E16fr3-sn and Sarvesh's E49 in `x_recall.py`; expected ~0.9909-0.9910
+**File:** `submissions/C4/` (padum `~/scratch/amlc_c3/output_C4`): matching **7c929413**, candidate_pairs 1a8b4f5c
+(unchanged), validator --check-ids PASS. Built by final-dd's new `x_recall.py` (uncommitted) from E16fr3's own files
+(`~/scratch/c4.sh`); with only the old lists the same code gives **e93605ad** (E16fr3, byte for byte). US / India
+byte-identical to E16fr3; France +2,916 (862,152 → 865,068). All four lists undo a France self-training veto or a
+no-address rejection (the main model trained on labels accepted, q >= 0.70, except nacore):
+
+| list | records | rule | evidence | my hand review |
+|---|---|---|---|---|
+| restore_nacore (Mohanish) | 1,078 | no address, core name = S1's, no other S1 with it, judge yes | US / India 98% true | 35 / 35 |
+| restore_vetona (E49, filtered) | 1,182 | vetoed, address without a house number, judge margin >= 2, S1's street words in it or unique name | E49 no-number part | 9.3 / 10 |
+| restore_samename (Mohanish, filtered) | 563 | vetoed, exact name at another number, S1's street (or unique name), not anchored, judge yes | US / India same street 95-100% | ~28 / 30 |
+| restore_exact (new) | 161 | vetoed at the S1's exact address, only S1 there, name adds no word (initials, website, dropped words) | US / India 98-100% | 29 / 30 |
+
+Expected LB change (per-S1 exact F0.5, `~/scratch/combo.py`): at the review's rates +0.00015 → **0.99096**; 10 points
+lower +0.00009 → 0.99090; 20 points lower +0.00003 → 0.99084 (break-even ~65-68%). Not 0.9916.
+
+**What was dropped and why (label evidence on US / India validation, hand review on France):**
+- **Mohanish's E16fr3-sn as built (fdea1f55): expected ≈ −0.0002, do not upload.** restore_samename: **1,795 of its 4,646
+  are anchored** (another candidate S1 on the record's street 1-13 numbers below it = that S1's decoy with a type word
+  swapped that spells another S1's name; France's formulaic names make these collisions common): **0% true on US /
+  India** (47 rows; 89-91% for the rest). Of the rest, 2,038 are on another street; with 3+ namesakes (France's are in
+  the same city) US / India are 54-64% true and my sample ~20-25%. Same street, not anchored: 813 (kept those the main
+  model accepted: 563).
+- **Sarvesh's E49 unfiltered (llmveto2/4/6): unsound as a blanket rule.** My 75-sample review: at the S1's exact address
+  ~49% true (a third are type-word swaps at the same address, Club→Société, Parents→Centre, that the judge says yes
+  to: the same-building decoys the vetoes rightly remove); no house number ~87%; same street ~75%; other street ~42%.
+  Kept only the no-number part (restore_vetona).
+- **Exact-address typos:** a first version allowed a typo'd extra word and let in **acronym-letter decoys** ("BKJV
+  Federation" for BKJ Federation, "KQF College" for QF College): half of a 40 sample. US / India: the model's own
+  rejections of exact-address typos are 98-99% false. restore_exact now allows no added word.
+- **General:** on US / India validation the model's rejections of every one of these kinds are 75-99% wrong records,
+  so the rules only undo a France self-training veto (the main model accepted), not the main model.
+- **Blocking (the 19:45 hypothesis): ruled out.** Same-address near-identical pairs in top-20: France 100% (28 missing
+  from the shortlist), US 100%; India 2,161 missing but **0.96% true** on validation (block.txt).
+
+## 2026-09-27 19:45 — the likely France gap: blocking (retrieval ranks); ruled-out levers
+- **Retrieval rank of E16fr3's accepted pairs** (`~/scratch/ranks.py`): rank 1 France **40.1%** vs India 60.0% / US
+  65.0%; ranks 11-15 France 5.0% vs 2.1 / 1.8%; ranks 16-20 **2.0%** vs 1.1 / 0.6%. France's formulaic names (city +
+  type word + legal form) crowd the true S1 down the bi-encoder's list; the tail at 20 is 2-3× heavier, so France
+  likely loses a few % of true matches before any model sees them (~17-35k records ≈ 0.0007-0.0015 LB: the size of
+  the gap to the top). **Being checked:** `~/scratch/block.py` → `~/scratch/block.txt` (same-address near-identical
+  (record, S1) pairs missing from top-20 / shortlist, per country; truth on US / India validation); missing test
+  pairs saved to `~/scratch/block_missing_test.parquet`. If confirmed, fix = address-key blocking (S1s at the record's
+  parsed address as extra candidates) or larger K, then score them (features + CEs + stages) or a label-validated rule.
+- **Ruled out (label-free test stats + validation):** empty France S1s with a same-address similar-name claimant
+  (US / India validation: 0.5% true; 97% of predicted-empty S1s are truly empty); twins (France 45% of S1s, US 39%,
+  India 52%); false-merge buckets by address (France 90% exact address); websites as a rescue (7% true on validation).
+- **Small, validated:** France initials rescue (a left-out record whose name is the S1's initials, at its exact
+  address, no other S1 there with those initials): 920 France records; validation 5 / 5 true, the US / India model
+  accepts such records anyway; worth ~+0.00004. Pairs in `~/scratch/noise_rescue_test.parquet` (use France initials only).
+
+## 2026-09-27 18:40 — Sarvesh's France threshold probes scored by hand review: 0.70 is right; none beats E16fr3
+Organisers added 2 uploads. Sarvesh's probe files on E16fr3 (sarvesh-exp 187ac31; padum
+`/scratch/scai/mtech/aib262045/amlc_exp/out_*`, only France changes). I labelled random samples of each file's changed
+pairs by hand (`~/scratch/thrdump.txt`, `resc.py`), then computed the exact expected change per S1 (`~/scratch/exdelta.py`:
+binomial over each touched S1, untouched accepted records taken as true, empty S1 truly empty w.p. 0.5):
+
+| file | change | sample | share true | expected Δ LB | expected LB |
+|---|---|---|---|---|---|
+| frT60 | +2,225 France pairs | 40 (0.60-0.65) + 40 | ~47% | −0.00010 (−0.00015 … −0.00006) | ~0.99070 |
+| frT65 | +1,154 | 40 (0.65-0.70) | ~51% | −0.00005 (−0.00007 … −0.00002) | ~0.99076 |
+| frT75 | −1,960 | 30 (0.70-0.75) | ~70% of the removed | −0.00001 (+0.00004 … −0.00005) | ~0.99080 |
+| frT80 | −4,315 | (0.75-0.80 band assumed ~75%) | | −0.00007 | ~0.99074 |
+| frresc30 | +79 empty France S1s filled | 25 | ~51% | ≈ 0 (±0.00001) | ~0.99081 |
+| E17fr3 | US / India from the 5.8% smaller candidate set (6,896 rows differ) | validation −0.00002 | | ≈ 0 (±0.0001) | ~0.99079 |
+
+- **Why lowering the France threshold loses:** the 0.60-0.70 band is half the name noise we want (initials "NC" /
+  "AR" / "RÉ", websites, no-number records) and half **type-word swaps at the S1's own address** (Musique→Culturelle,
+  Club→Fetes, Union→Amicale): the same-building decoys whose rejection gave dd its +0.0032. The reject list only covers
+  pairs accepted at 0.70, so a lower threshold lets them back in. Precision falls 70% → 51% → 42% down the bands; a
+  France addition needs ~72% to pay off in F0.5, so 0.70 sits at the break-even.
+- **Verdict:** no probe beats E16fr3 in expectation; all are within ±0.0001 or below. E17fr3 is the only one with a
+  second benefit (5.8% smaller candidate set, which the organisers rank) at the same expected score, but the zip's code
+  would have to build it. If the last upload is what counts, keep the last upload for the file we ship.
+
+## 2026-09-27 17:55 — why we trail the top (0.992 vs 0.990807): France recall, spread thin; no single fixable bucket
+Label-free test statistics of E16fr3 (padum `~/scratch/{dist,qdist,frdump,frcount,street,twins}.py`):
+- **Per-S1 structure.** Train truth: 3.46 matches per S1 and 5.58% empty S1s in *both* US and India (a generator
+  constant). Test predictions: US 3.40 / 5.81%, India 3.40 / 5.76%, **France 3.32 / 6.00%**, and France has fewer
+  S1s with ≥ 6 matches (9.8% vs 10.7%). If France's generator matches the others, France misses ~2-3% of its true
+  matches (~20k records) beyond US / India, plus ~500 wrongly empty S1s. Back-solving the LB with US / India at their
+  validation (~0.993) puts France near 0.978; the gap to 0.992 is about +0.008 on France.
+- **Model certainty.** Share of records whose base q (best S1) is 0.1-0.4 / 0.4-0.7 / 0.7-0.9: US 1.08 / 0.56 / 0.28%,
+  India 0.54 / 0.36 / 0.20%, **France 3.21 / 1.93 / 1.59%**. The chain then drops 19,118 base-accepted records (vetoes)
+  and 11,105 (same-address rejects).
+- **No large false-merge bucket.** With street names parsed (types, articles, regions removed), France's accepted pairs
+  are 90.2% at the S1's exact address, 0.43% same number / other street, 0.92% shifted number, 2.6% no address.
+  Core-name twins: 45% of France S1s (US 39%, India 52%); twin share of accepted no-address records 16% (US 11%,
+  India 15%); validation precision there 0.94 (no-address + twin), 0.992 (no-address, no twin), 0.9997 (with address).
+- **Where the missed records are** (hand-read samples, `~/scratch/frdump.txt`): same-address records with name noise
+  the generator also uses in US / India (initials "CC", "LI"; websites "solidaritefrreseurl.com"; "SA"; typos
+  "Nt Foyer"), killed by one veto or by a base q of 0.4-0.7 despite three confident self-trained stacks; decoys
+  (shifted numbers, type-word swaps, other street) are correctly out. Sizes: base 0.4-0.7 with all 3 self-trained
+  stacks ≥ 0.9: 1,019; vetoed at the exact address: 5,316 (name similarity ≥ 80: 1,204); left out at the exact
+  address with base ≥ 0.4: 10,729.
+- **Read:** France's loss is recall from model uncertainty on French text, spread thin. F0.5 makes a false add cost
+  ~2.5× a recovered match, so a rescue needs ~72% precision, and each identifiable subset is worth +0.00002-0.0001.
+  Closing +0.0012 needs a more certain France model (e.g. France self-training used as the main model, not only as a
+  veto; a larger judge), which needs GPU hours and cannot be checked without France labels or an upload.
 
 ## 2026-09-27 16:00 — LB: E16fr3 = 0.990807 (+0.000458 over variant_v10seed_dd): new best, the final file
 - Expected 0.99067 (validation for US / India + hand review for France): the upload came in +0.00014 above it, so the

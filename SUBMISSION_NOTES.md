@@ -20,7 +20,13 @@ Deadline 27 Sep 23:59 IST (confirm on the portal that the zip has the same deadl
   weights, `student_resource/`.
 
 ## To do
-- [x] **Final file** (27 Sep 15:46): **E16fr3, leaderboard 0.990807** (matching_results e93605ad, candidate_pairs
+- [x] **Final file** (27 Sep 20:40): **C4, leaderboard 0.99084** (matching_results 7c929413, candidate_pairs 1a8b4f5c):
+      E16fr3 + four France recall lists (`x_recall.py`: restore_nacore, restore_vetona, restore_samename,
+      restore_exact). final-dd **579db0d** (pushed) builds it; README, documentation and figure updated. Package rebuilt
+      from a clean `git archive` of 579db0d: `submission/SSM_submission.zip` (122 MB), validator --check-ids PASS,
+      output = C4 byte for byte, no CR bytes, no cluster paths, no notes. C4 is the last leaderboard upload (user).
+      Only step left: upload the zip on the portal before 23:59.
+- [x] Previous final file (27 Sep 15:46): **E16fr3, leaderboard 0.990807** (matching_results e93605ad, candidate_pairs
       1a8b4f5c = the variant's, 12,760,925 pairs, 7.37 per S1). final-dd d7db51d (pushed) builds its method (bge
       lane, `x_recall.py`); README, documentation and figure updated; fefa59e applies Sarvesh's doc review
       (DOC_REVIEW.md: table fix, +0.0081, error-table scope, veto validated on the LB). Package rebuilt from fefa59e:
