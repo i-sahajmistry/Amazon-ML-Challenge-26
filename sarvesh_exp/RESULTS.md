@@ -17,8 +17,13 @@ md5 e73c409e. Each item: what, evidence, how to apply, decision rule. Details an
 4. **OPTIONAL, LEADERBOARD-ONLY — France changes (no labels, cannot be validated):** E2 (bge as a 4th France veto,
    −3,656 France matches), E3 (France base from bge + LLM round 2, −2,500), E4a / E4b (France threshold 0.65 / 0.75,
    +1,446 / −1,960). Use only if a spare upload is available; past France vetoes helped, threshold moves are a guess.
-5. **PENDING:** E5 (generic `rule_fr` + `x_ddfix` lists vs the variant's lists — compliance), E8 (per-country
-   thresholds), E9 (France base from the bge stack), E10 (smaller candidate set for US / India, validated).
+5. **COMPLIANCE ✅ — the generic France fixes reproduce the best file exactly (E5).** Mohanish's data-only
+   `rule_fr.py` + `x_ddfix.py` (final-dd HEAD, `unlabelled`, no country names, no hand lists), run on the variant's own
+   scores, give restore / reject lists **pair-for-pair identical** to the variant's (32,620 / 32,620 and 11,105 /
+   11,105, zero differences), and the file is **byte-identical** to E1 (md5 ab07d90e); E0 is byte-identical to the
+   0.990349 file. So the final code can use the generic steps (`x_ddfix` + `unlabelled`) with no change in output.
+6. **PENDING:** E8 (per-country thresholds), E9 (France base from the bge stack), E10 (smaller candidate set for US /
+   India, validated).
 
 
 Not part of the submission package (this folder is outside `ber/`). Scripts here are exactly what ran on padum.
@@ -46,7 +51,7 @@ change can only be judged on the leaderboard; for those we report how many Franc
 | E3 | E1, France base from bge + LLM round 2 | … / … / 856,838 (−2,500) | `f8466461` | none (France) | ❓ LB only |
 | E4a | E1, France threshold 0.65 (instead of 0.70) | … / … / 860,784 (+1,446) | `a95424e3` | none (France); US/India validation is flat 0.60–0.70 | ❓ LB only |
 | E4b | E1, France threshold 0.75 | … / … / 857,378 (−1,960) | `010c7d23` | none (France) | ❓ LB only |
-| E5 | E1 with the generic France fixes (`rule_fr` + `x_ddfix`) instead of the variant's lists | pending | | compares generic vs variant lists | compliance check |
+| E5 | E1 with the generic France fixes (`rule_fr` + `x_ddfix`, `unlabelled`) instead of the variant's lists | 2,255,799 / 2,751,628 / 859,338 | `ab07d90e` (= E1) | lists pair-for-pair identical to the variant's (restore 32,620, reject 11,105) | ✅ **compliance: generic code gives the identical file** |
 | E7 | US / India from the **mean** of the bge and main stacks | 2,255,059 / 2,751,092 / 859,338 | | validation 0.99279 < bge alone 0.99283 | ❌ **does not work**: averaging is worse than bge alone (file `138c24f2` built, PASS, not to be used) |
 
 ## US / India validation (labels; entity folds 8-9, distractors weighted, copy-free), `exp3.py`
