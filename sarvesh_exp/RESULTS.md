@@ -33,7 +33,15 @@ md5 e73c409e. Each item: what, evidence, how to apply, decision rule. Details an
    0.99374). The gap's cause is unknown (and the ~0.9915 LB estimate for US / India is itself soft).
    **DO NOT APPLY — threshold per crowding level:** cross-fitted gain +0.00005 / +0.00010 (mean +0.00008), and the
    best thresholds flip between folds for 3 of 7 groups: noise-level.
-9. **PENDING:** E10 (smaller candidate set for US / India, validated) — step 1 running.
+9. **SMALL BUT CONSISTENT — rescue empty S1s (E13a).** An S1 with no accepted record takes its best claimant if its
+   q ≥ ~0.5 (US / India). Cross-fitted on validation: +0.00005 (fit 8 → 9) and +0.00008 (fit 9 → 8), mean +0.00007;
+   positive for every t in 0.4–0.65 on both folds. Candidate to apply after E1.
+10. **DO NOT APPLY — drop a lone medium-confidence match (E13b):** negative for every t (−0.00003 … −0.00064).
+11. **WHERE US / INDIA LOSE (E14, validation 0.99283, loss 0.00717):** missed some true matches 0.00470 (66%), S1 left
+    empty although it has matches 0.00152 (21%), distractor merged 0.00045, wrong-S1 record merged 0.00041,
+    singleton given a record 0.00009. **~87% of the remaining loss is recall**, so recall rules are the lever (E15
+    running: accept "siblings" just under 0.70 when the S1 already has a very confident match).
+12. **PENDING:** E10 (smaller candidate set for US / India, validated) — step 1 running.
 
 
 Not part of the submission package (this folder is outside `ber/`). Scripts here are exactly what ran on padum.
