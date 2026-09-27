@@ -84,6 +84,20 @@ md5 e73c409e. Each item: what, evidence, how to apply, decision rule. Details an
 | Smaller-set sandbox (feats2, CE arrays, extras cut at shortlist P ≥ 0.005) | `amlc_e10_0.005/work/` |
 | Control rerun (all pairs) and stage-2 tuning runs | `amlc_e10_0.001/`, `amlc_s2_lr/`, `amlc_s2_big/` |
 | Job scripts + logs exactly as run | `exp/` (`exp10.pbs` = E17, `exp11.pbs` = E19, `e10_run.pbs`, `s2tune.pbs`) |
+Every TSV pair we generated (`amlc_exp/out_<name>/{matching_results,candidate_pairs}.tsv`, all readable by aib262144,
+all pass `validate_submission.py --check-ids`; not in git: 94 MB + 170–179 MB each):
+
+| out dir | what | matching md5 | candidate md5 | use? |
+|---|---|---|---|---|
+| out_E17 | E1 + rescue on the smaller candidate set | `eb6fdbec` | `15fb51cc` (12.02M) | ✅ **best validated** |
+| out_E19 | E17 + E2 (4th France veto) | `c91f83b1` | `15fb51cc` | ❓ LB bet |
+| out_E16 | E1 + rescue, full candidate set | `a019f175` | `1a8b4f5c` (12.76M) | ✅ (= E17 without the smaller set) |
+| out_E1 / out_E5 | bge stack for US / India (E5 = generic France fixes, identical) | `ab07d90e` | `1a8b4f5c` | ✅ superseded by E16 / E17 |
+| out_E0 | the 0.990349 file rebuilt (sanity) | `e73c409e` | `1a8b4f5c` | reference |
+| out_E1b | bge + LLM round 2 | `34173047` | `1a8b4f5c` | ≈ E1 |
+| out_E2 / E3 / E4a / E4b / E9 | France-only variants on E1 | `7a35ceb9` / `f8466461` / `a95424e3` / `010c7d23` / `ae0ecb86` | `1a8b4f5c` | ❓ LB only |
+| out_E7 | mean of stacks | `138c24f2` | `1a8b4f5c` | ❌ do not use |
+
 To rebuild E17 in place: `AMLC_ROOT=/scratch/scai/mtech/aib262045/amlc_e10_0.005` + the `x_final.py` line in `exp10.pbs`
 (write OUT to your own dir; the FROM / RESTORE / REJECT files are symlinks to your variant files).
 
