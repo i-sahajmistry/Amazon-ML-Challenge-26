@@ -24,7 +24,7 @@ Deadline 27 Sep 23:59 IST (confirm on the portal that the zip has the same deadl
       1a8b4f5c): C4 + restore_alias + initials + reject_decword. final-dd **a4c3fa1** (pushed) builds it. Package rebuilt
       from a clean `git archive` of a4c3fa1: `submission/SSM_submission.zip` (122 MB), validator --check-ids PASS,
       output = C8 byte for byte, x_recall.py = the one that built C8, no CR bytes, no cluster paths, no notes. C8 is the
-      last leaderboard upload. README / documentation still describe C4 (user's decision). Only step left: upload the
+      last leaderboard upload. README, documentation and figure updated for C8 (final-dd e835695); zip rebuilt 22:40. Only step left: upload the
       zip on the portal before 23:59.
 - [x] **Final file** (27 Sep 20:40): **C4, leaderboard 0.99084** (matching_results 7c929413, candidate_pairs 1a8b4f5c):
       E16fr3 + four France recall lists (`x_recall.py`: restore_nacore, restore_vetona, restore_samename,

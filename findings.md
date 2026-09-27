@@ -7,8 +7,8 @@ validation (entity folds 8-9, distractors weighted to the test share of 39%, cop
 - **Final file: C8, leaderboard 0.99091, rank 18** (C4 0.99084; E16fr3 0.990807; top ~0.992). `submissions/C8/`:
   matching_results a7d37122, candidate_pairs 1a8b4f5c. It is the last upload.
 - **Code: final-dd a4c3fa1 (pushed)** builds it (`x_recall.py`: C4's lists + restore_alias, initials in restore_exact,
-  reject_decword; `reproduce.sh`). README / documentation not updated for C8 (user's call; they describe C4).
-  **Package** `submission/SSM_submission.zip` rebuilt 22:36 from a clean `git archive` of a4c3fa1; audited.
+  reject_decword; `reproduce.sh`). README, documentation and figure updated for C8 (final-dd e835695).
+  **Package** `submission/SSM_submission.zip` rebuilt 22:40 from a clean `git archive` of e835695; audited.
 - **Reproducibility:** a from-scratch rerun of dd matched every stage's validation within 0.0001 and 98.9% of S1 rows
   (entry 11:50); GPU training is not bit-exact.
 - **Before the final submission:** checklist in [SUBMISSION_NOTES.md](SUBMISSION_NOTES.md).
