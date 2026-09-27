@@ -31,7 +31,12 @@ reject.
   python x_recall.py COMB LLM RESTORE REJECT [MAIN]   e.g. _fin _v10p restore_dd reject_dd _v10plw
       COMB: x/test_q{COMB} (x_final.py SAVE_Q); LLM: x/llm_test{LLM}; RESTORE / REJECT: x_ddfix.py's lists; MAIN: the
       main stack before the vetoes (samename, vetona, exact); P5 (env, default _v10): candidate pairs x/p5_test{P5}
-      -> x/restore_{empty,nafr,nacore,samename,vetona,exact}.parquet for x_final.py RESTORE=...
+      -> x/restore_{empty,nafr,nacore,samename,vetona,exact}.parquet for x_final.py RESTORE=...,
+         x/reject_decword.parquet for x_final.py REJECT=...
+  reject_decword    (a reject list) a record of a country without labels that adds a decoy-like word of that country
+                    (x_ddfix's census: TV >= 0.20, the same-building type-word swap) at any position: the same-address
+                    fixes reject these only at the S1's house number; the recall lists above and the base stack still
+                    accept ~160 elsewhere (no house number, another number, "Internes Club" <- "Internes Union").
 Records the judge has not scored (stage-2 q outside its band) go to x/sn_rows.parquet: `ROWS=sn_rows python x_llm.py
 rows` scores them, then rerun this script.
   python x_recall.py val [VQ]                  the empty-S1 rule on US / India validation (x/llm_val{VQ}), with labels"""
@@ -86,6 +91,7 @@ def lists(comb, llm, restore, reject, main=None):
     sel = unl & ~acc & noaddr & ~twin & same & (m > 0) & ~key.isin(rj)
     d[sel][["rid", "sid"]].to_parquet(f"{XD}/restore_nafr.parquet")
     print("restore_nafr", int(sel.sum()), d[sel].c.value_counts().to_dict(), flush=True)
+    decword(d, unl, t1, t2)
     free = unl & ~acc & ~key.isin(rj)
     # accepted by the main stack before the vetoes (MAIN): the kinds below are restored only where the model trained on
     # labels said yes and only a self-trained veto said no (on US / India the model's own rejections of them are 75-99%
@@ -154,7 +160,7 @@ def lists(comb, llm, restore, reject, main=None):
     # restore_exact: vetoed at the S1's exact address, the only S1 there, the name adds no word the S1's name lacks
     here = Counter((c1[s], n1(s), sw1(s)) for s in np.flatnonzero(np.isin(ct1, unlabelled())))
     sel = np.zeros(len(d), bool)
-    for i in np.flatnonzero(base & ~noaddr):
+    for i in np.flatnonzero(free & ~noaddr):
         r, s, c = d.rid.values[i], d.sid.values[i], d.c.values[i]
         k, w = n2(r), sw2(r, c)
         if k < 0 or k != n1(s) or here[(c, k, sw1(s))] != 1 or not (on(sw1(s), w) and on(w, sw1(s))):
@@ -163,9 +169,47 @@ def lists(comb, llm, restore, reject, main=None):
         ini = len(R) == 1 and 2 <= len(R[0]) <= 5 and any("".join(x[0] for x in S if len(x) >= j).startswith(R[0]) for j in (1, 4))
         nm = anyascii(o.business_name.values[r]).lower().strip()
         web = bool(re.search(r"\.[a-z]{2,4}$|^[#@]", nm)) and fuzz.partial_ratio("".join(S), re.sub(r"[^a-z]", "", nm.split(".")[0])) >= 80
-        sel[i] = set(R) <= set(S) or ini or web
+        sel[i] = ini or base[i] and (set(R) <= set(S) or web)
     d[sel][["rid", "sid"]].to_parquet(f"{XD}/restore_exact.parquet")
     print("restore_exact", int(sel.sum()), d[sel].c.value_counts().to_dict(), flush=True)
+    # restore_alias: at the S1's exact address, the only S1 there, a made-up name sharing nothing with the S1's (the
+    # generator's unrelated-DBA noise), restored when the main stack's q >= 0.80 (vetoed; US / India validation 97-99.8%
+    # true), or q >= 0.10 with at most 2 made-up names at the S1 (~90%; below 0.10 they are 0% true)
+    cnt = Counter(w for sp in ("train", "test") for x in normed(sp, 1).nn.values for w in set(x.split()))
+    gen = {w for w, k in cnt.items() if k >= 200}
+    mk = np.zeros(len(d), bool)
+    for i in np.flatnonzero(unl & ~noaddr):
+        r, s, c = d.rid.values[i], d.sid.values[i], d.c.values[i]
+        R, S = t2.nn.values[r].split(), [x for x in t1.nn.values[s].split() if len(x) >= 2]
+        new = [x for x in R if len(x) >= 4 and x.isalpha() and x not in cnt]
+        if not new or not S or not all(x in new or x in gen or len(x) <= 2 for x in R):
+            continue
+        k, w = n2(r), sw2(r, c)
+        if k < 0 or k != n1(s) or here[(c, k, sw1(s))] != 1 or not (on(sw1(s), w) and on(w, sw1(s))):
+            continue
+        nm = anyascii(o.business_name.values[r]).lower().strip()
+        mk[i] = not (re.search(r"\.(com|fr|in|net|org)\b|^[@#]", nm) or any(fuzz.ratio(x, y) >= 70 for x in R for y in S)
+                     or any(len(y) >= 4 and y in "".join(R) for y in S))
+    na = pd.Series(mk).groupby(d.sid.values).transform("sum").values
+    sel = mk & free & ((mq >= 0.80) | ((mq >= 0.10) & (na <= 2)))
+    d[sel][["rid", "sid"]].to_parquet(f"{XD}/restore_alias.parquet")
+    print("restore_alias", int(sel.sum()), d[sel].c.value_counts().to_dict(), flush=True)
+
+
+def decword(d, unl, t1, t2):
+    """reject_decword: records of the countries without labels that add a decoy-like word (x_ddfix's census)"""
+    from x_anatomy import positions
+    from x_ddfix import census, words
+    sel = np.zeros(len(d), bool)
+    for c in sorted(set(d.c.values[unl])):
+        i = np.flatnonzero(d.c.values == c)
+        x = census(positions(d.iloc[i], t1, t2))
+        w = words(x, 300)
+        dec = set(w[w.tv >= 0.20].index)
+        sel[i[np.array([bool(set(a.split()) & dec) for a in x["add"].values])]] = True
+    d[sel][["rid", "sid"]].to_parquet(f"{XD}/reject_decword.parquet")
+    print("reject_decword", int(sel.sum()), d[sel].c.value_counts().to_dict(), f"(accepted now: {int((sel & (d.q.values >= T)).sum())})",
+          flush=True)
 
 
 def val(vq):
