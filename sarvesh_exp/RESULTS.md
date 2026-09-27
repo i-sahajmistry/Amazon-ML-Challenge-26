@@ -68,8 +68,10 @@ md5 e73c409e. Each item: what, evidence, how to apply, decision rule. Details an
     - **DO NOT APPLY — `big`** (127 leaves, min_data_in_leaf 200, BAG 5): stage 2 0.70 0.99276 vs 0.99274, + LLM
       0.70 **0.99289 = control 0.99289**; logloss worse (0.00817–0.00819 vs 0.00812–0.00815). No gain.
     - RUNNING — `lr` (learning rate 0.05 → 0.025, BAG 10): early logloss better (0.00810 vs 0.00813).
-15. **LEADERBOARD BET — E19 = E17 + E2** (`exp11.pbs`, building): US / India as E17, France as E2 (bge + LLM stack
-    as a 4th France min-veto). Final ranking = private score of the best public submission, so a worse upload costs
+15. **LEADERBOARD BET — E19 = E17 + E2** (`exp11.pbs`, `amlc_exp/out_E19/`): US / India as E17, France as E2 (bge +
+    LLM stack as a 4th France min-veto). Checked: US / India pair-for-pair identical to E17, France identical to E2
+    (855,682, −3,656 vs the variant). matching md5 **`c91f83b1`**, candidate_pairs `15fb51cc` (12.02M), validator
+    `--check-ids` **PASS**. Final ranking = private score of the best public submission, so a worse upload costs
     only the slot. Top 3 is 0.99117 (+0.00082 over us); validated changes give ≈ +0.0002, so a France change is the
     only lever big enough to matter.
 
@@ -116,6 +118,7 @@ change can only be judged on the leaderboard; for those we report how many Franc
 | E16 | E1 + rescue empty S1s at q ≥ 0.5 (US / India) | 2,256,168 / 2,751,925 / 859,338 | `a019f175` | validation E1 +0.00012, rescue +0.00009 cross-fitted; 666 S1s rescued | ✅ **best validated file**, PASS |
 | E10 | US / India shortlist cut-off 0.005 (−5.8% test pairs), full retrain | (see E17) | — | validation +LLM 0.99287 vs control 0.99289 | ✅ no measurable cost; optional, for a smaller candidate file |
 | E17 | E16 on the E10 smaller candidate set (US / India P ≥ 0.005, retrained) | 2,256,386 / 2,751,391 / 859,338 | `eb6fdbec` | candidates 12.02M (−5.8%, `15fb51cc`); validation as E16 | ✅ **best validated file with a smaller candidate set**, PASS |
+| E19 | E17 + E2 (bge as a 4th France veto) | 2,256,386 / 2,751,391 / 855,682 | `c91f83b1` | US / India = E17; France = E2 (no labels) | ❓ LB bet; PASS |
 | E7 | US / India from the **mean** of the bge and main stacks | 2,255,059 / 2,751,092 / 859,338 | | validation 0.99279 < bge alone 0.99283 | ❌ **does not work**: averaging is worse than bge alone (file `138c24f2` built, PASS, not to be used) |
 
 ## Per-country comparison against the variant (0.990349): what each file changes
