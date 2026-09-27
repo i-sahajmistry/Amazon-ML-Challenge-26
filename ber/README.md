@@ -2,7 +2,7 @@
 
 Match every Source 2 / Source 3 record to the Source 1 (reference) entity it belongs to, scored by macro F0.5.
 
-**Leaderboard best: v10_fr3_llm_dd, 0.990282** (2026-09-27; v10_fr3_llm 0.987071, v10_fr3 0.986077, v10_fr2 0.985942, v9p_frand 0.984742,
+**Leaderboard best: variant_v10seed_dd, 0.990349** (2026-09-27; v10_fr3_llm_dd 0.990282, v10_fr3_llm 0.987071, v10_fr3 0.986077, v10_fr2 0.985942, v9p_frand 0.984742,
 v7w 0.982641). The public and private leaderboards are both subsets of the provided test file, so every country
 scored is one we see: US, India and France.
 **Current pipeline: v10_fr3_llm** = v9p_frand (below) with four changes, see [After v9p_frand](#after-v9p_frand-v10_fr2):
@@ -153,6 +153,7 @@ Validation: entity folds 8–9, distractors at the test share of 39%, macro F0.5
 | v10_fr3 | v10_fr2 + the round-3 France veto | 0.99285 | 0.986077 |
 | v10_fr3_llm | v10_fr3 with the LLM judge blended into v10's unsure records | 0.99282 (v10's own set, 0.99262 without) | 0.987071 |
 | **v10_fr3_llm_dd** | v10_fr3_llm + France same-address fixes (`x_wordlists.py`): restore 32,439 rejected records whose added words spread like true matches, reject 11,655 accepted type-word swaps | US / India unchanged | **0.990282** |
+| **variant_v10seed_dd** | dd with the three France rounds seeded from v10's own decisions and started from v10's CEs (no v8 / v9 stacks), LLM judge on every unsure v10 row ([variant_v10seed_dd/](variant_v10seed_dd/)) | 0.99282 (as dd) | **0.990349** |
 
 Validation scores are at threshold 0.70 from v9 on.
 

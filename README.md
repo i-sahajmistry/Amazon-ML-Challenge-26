@@ -3,6 +3,7 @@
 Cluster setup for IIT Delhi PADUM (account, proxy, conda, GPU jobs) is in [HPC_SETUP.md](HPC_SETUP.md).
 The pipeline, results so far and how to reproduce the best submission are in [ber/README.md](ber/README.md)
 (branch `ber-pipeline`).
+**Current status (best file, what is running, open decisions): top of [findings.md](findings.md)** (branch `v11`).
 
 ## Repo setup
 The repo is private, so you need collaborator access.
