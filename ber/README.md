@@ -6,6 +6,8 @@ This branch holds only the code that builds the submitted file **v10_fr3_llm_dd 
 
 **Branch `variant-frB`:** also builds **variant_frB** (leaderboard pending) = variant_v10seed_dd (0.990349: the
 France self-training rounds seeded from v10) + two recall fixes (`x_recall.py`); see [variant_frB](#variant_frb).
+**Branch `variant-frC`:** **variant_frC** (leaderboard pending) = variant_frB with US / India from the bge + LLM
+stack (validation +0.00012); France is identical to variant_frB. See [variant_frC](#variant_frc).
 
 ## Pipeline
 
@@ -69,6 +71,7 @@ on entity folds 8–9 after fitting on 4–7 (US / India validation F0.5 0.99282
 
 | File | Score |
 |---|---|
+| variant_frC (`variant-frC`: variant_frB, US / India from the bge + LLM stack) | pending |
 | variant_frB (`variant-frB`: variant_v10seed_dd + `x_recall.py`) | pending |
 | **variant_v10seed_dd** (France rounds seeded from v10; `variant_v10seed_dd/variant.sh`) | **0.990349** |
 | v10_fr3_llm_dd (`reproduce.sh`) | 0.990282 |
@@ -116,3 +119,22 @@ python src/x_recall.py val                        # the empty-S1 rule on US / In
 | **variant_frB**, accepted | 2,255,704 | 2,751,440 | 865,174 | **73b4a5ea** |
 
 candidate_pairs.tsv is unchanged (1a8b4f5c: 12,760,925 pairs, 7.37 per S1).
+
+## variant_frC
+
+variant_frB with US / India taken from the bge + LLM stack (`x/test_q_v10bplw`: `bge-reranker-v2-m3` as a third
+cross-encoder on v10's folds, stages 1-2, then the LLM judge blended in). On US / India validation at 0.70 it scores
+0.99294 against the main + LLM stack's 0.99282, better in both countries (Sarvesh's experiment E1). France keeps the
+variant's chain and variant_frB's fixes, so its decisions are identical to variant_frB's; the empty-S1 list is
+recomputed on the bge scores for US / India.
+```bash
+AMLC_ROOT=/variant/root bash variant_frC/frC.sh   # also needs x/test_q_v10bplw (see the script's header)
+```
+| | US | India | France | md5 (matching_results) |
+|---|---:|---:|---:|---|
+| US / India from bge + LLM, France as the variant (E1) | 2,255,799 | 2,751,628 | 859,338 | ab07d90e |
+| + empty-S1 rule (1,362 rows: US 508, India 415, France 439) and the no-address fix (5,445, France) | | | | |
+| **variant_frC**, accepted | 2,256,307 | 2,752,043 | 865,174 | **7d66d4ea** |
+
+candidate_pairs.tsv is unchanged (1a8b4f5c). Building it from scratch also needs the bge steps (about 2 GPU hours: fit,
+scoring, stages) before the LLM blend.

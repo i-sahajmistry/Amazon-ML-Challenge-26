@@ -1,4 +1,4 @@
-# variant_frB: two recall fixes on variant_v10seed_dd
+# variant_frB / variant_frC: recall fixes on variant_v10seed_dd, and the bge stack for US / India
 
 Branch `variant-frB`, built on `final-dd` 187946d. It adds `src/x_recall.py`, `variant_frB/frB.sh` and Sahaj's
 `variant_v10seed_dd/` scripts (from v11), which build the best leaderboard file so far (0.990349).
@@ -59,3 +59,17 @@ Checked and not used:
 - `variant_frB/frB.sh` (new): the steps on the variant's files.
 - `variant_v10seed_dd/` (from v11): Sahaj's scripts for the variant.
 - `README.md`: variant_frB section, pipeline step 11 and leaderboard rows. This file is new.
+
+## variant_frC (branch `variant-frC`)
+
+variant_frC = variant_frB with US / India from the bge + LLM stack. France is unchanged.
+- **Evidence:** on US / India validation at 0.70, bge + LLM scores 0.99294 against 0.99282 for the main + LLM stack
+  that variant_frB uses (+0.00012, better in both countries; Sarvesh's experiment E1). Sahaj's v10b_fr3_llm2_dd
+  (0.9902) also moved France onto bge; here France stays on the variant's chain.
+- **France:** identical to variant_frB (865,174 accepted; the same 5,445 no-address restores).
+- **US / India:** the empty-S1 list is recomputed on the bge scores (US 508, India 415, France 439). Accepted: US
+  2,256,307, India 2,752,043.
+- **Output:** `matching_results.tsv` md5 7d66d4ea76495ba67a04484bc4bb9311; `candidate_pairs.tsv` 1a8b4f5c (unchanged);
+  validator `--check-ids` PASS. Built by `variant_frC/frC.sh`, which first reproduces E1 (md5 ab07d90e).
+- **Expected leaderboard:** about 0.9906-0.9907 (variant_frB + ~0.0001).
+- **Cost:** the final build also needs the bge cross-encoder (fit ~50 min, scoring ~1.5 h, stages) before the LLM blend.
