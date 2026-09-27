@@ -37,18 +37,14 @@ Deadline 27 Sep 23:59 IST (confirm on the portal that the zip has the same deadl
 - [x] **`package.sh`** (6832d5f): builds `$AMLC_ROOT/submission/<TEAM>_submission/` + zip, `reproduce.sh` included,
       validator `--check-ids` by absolute path. On Windows run it from a `git -c core.autocrlf=false archive` export
       (the worktree's line endings can be CRLF).
-- [ ] **Write `Documentation_template.md`**: the one in `ber/` on v11 still describes v1 (25 Sep, exact search +
-      LightGBM, 0.9890) and `final-dd` has none. Cover blocking with numbers (7.37 candidate pairs per S1, the
-      recall the shortlist keeps on validation, the reduction ratio), the matcher stack, the LLM judge, self-training
-      for the country without labels, the same-address fixes, validation, licences, compute. Use architecture.md as
-      source material; the file itself stays out. Figure: `ber/pipeline.drawio` (source), `ber/pipeline.png`
-      (export): put the PNG in the zip next to the .md, or export the document to PDF. The figure shows the France
-      rounds starting from the main cross-encoders (variant_v10seed_dd); if dd is the final file, say that its first
-      two rounds started from the older v8 cross-encoders.
+- [x] **Write `Documentation_template.md`** (final-dd db4d351, 13:14): all the organisers' sections, team SSM, embeds
+      `pipeline.png` (figure checked against the code and corrected). Numbers are the variant's: when the padum
+      output replaces it, update the candidate numbers (13,377,149 pairs, 7.72 per S1, 1.34 per record, reduction
+      ratio), the France restore / reject counts, the validation, the LB row and the reproducibility bullet; the
+      figure's candidate_pairs box too (12.76M / 7.37 / 1.28). Then rebuild the package.
 - [x] **Package grep**: no `/scratch`, `/home`, `aib262144`; country names only in docstrings and `common.py`'s self-test.
-- [x] **Package built** 12:26: `submission/SSM_submission/` + `SSM_submission.zip` (122 MB, 32 files, no CRLF),
-      validator `--check-ids` PASS, md5 e73c409e / 1a8b4f5c. Its `Documentation_template.md` is still the blank
-      template: rebuild the package after writing it (`bash package.sh SSM <tsv dir>`).
+- [x] **Package rebuilt** 13:14 from final-dd db4d351: `submission/SSM_submission.zip` (122 MB, 32 files, no CRLF,
+      no cluster paths), validator `--check-ids` PASS, md5 e73c409e / 1a8b4f5c, filled-in documentation + figure.
 - [x] **Size**: the zip is 122 MB; the portal has no upload size limit (user, 27 Sep).
 
 ## Remember

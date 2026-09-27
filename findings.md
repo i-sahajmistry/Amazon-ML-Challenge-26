@@ -3,27 +3,46 @@
 Newest first. Each entry: what was measured, the number, what it means. LB = public leaderboard; "val" = US/India
 validation (entity folds 8-9, distractors weighted to the test share of 39%, copy-free).
 
-## Current status for the team (read this first; updated 2026-09-27 11:50 IST)
+## Current status for the team (read this first; updated 2026-09-27 13:20 IST)
 - **Best leaderboard: `variant_v10seed_dd`, 0.990349** (dd 0.990282, v10_fr3_llm 0.987071). File: Sahaj's PC
   `submissions/variant_v10seed_dd/`, padum `~/scratch/amlc_variant/output_variant_dd/`; matching_results md5 e73c409e,
   candidate_pairs md5 1a8b4f5c (= dd's: 12,760,925 pairs, 7.37 per S1); validator --check-ids PASS.
 - **What it is:** dd with the France chain rebuilt on v10 alone: v10 → three France self-training rounds seeded from
   v10's own decisions (each a veto) → LLM judge on every unsure v10 row → France same-address fixes → threshold 0.70.
-  Commands as run: [ber/variant_v10seed_dd/](ber/variant_v10seed_dd/) (final-dd a707292's code on the original run's
-  v10 files).
-- **Clean code: branch `final-dd`**: only the modules and `reproduce.sh` that build dd (0.990282) from the provided
-  zip; no country names (countries without training labels are found from the data); seeds set. Its last steps
-  rebuild dd byte for byte from the original run's q files (entry 04:45).
-- **Reproducibility check: done** (entry 11:50). `final-dd` rebuilt dd from an empty work/ in 8.5 h: validation
-  equal at every stage, validator PASS, 98.9% of S1 rows identical to the submitted file (F0.5 0.9978 against it),
-  candidate set 7.72 per S1 (submitted 7.37). GPU training is not bit-exact, so it matches closely, not byte for
-  byte. HEAD's country-free last steps give the rerun's file byte for byte.
-- **Candidate set** (the organisers now rank a smaller candidate_pairs.tsv higher): 7.37 pairs per S1. A tighter
-  shortlist (6.27 per S1) loses France matches (entry 10:10, `tight_dd`), so it is not used.
-- **Open:** (1) is `variant_v10seed_dd` the final file? (2) If so, `final-dd` should build it: the variant's steps in
-  `reproduce.sh` instead of the v9s / v9s2 / v10s3 rounds, checked on the rerun's v10 files (~4-5 h on one GPU).
-- **Before the final submission:** checklist in [SUBMISSION_NOTES.md](SUBMISSION_NOTES.md) (what goes in the zip, what
-  must stay out: architecture.md and review/ are on v11 for the team only).
+  Commands as run: [ber/variant_v10seed_dd/](ber/variant_v10seed_dd/).
+- **Clean code: branch `final-dd`** (pushed): `reproduce.sh` builds the variant's pipeline from the provided zip, v10
+  only (no v8 / v9 stacks); no country names; seeds set. README, `Documentation_template.md` (filled in, team SSM:
+  Sahaj Mistry, Sarvesh Nikas, Mohanish Baviskar) and `pipeline.png` are on it.
+- **Package** `submission/SSM_submission.zip` (rebuilt 13:14 from final-dd db4d351): the variant's files, the code, the
+  filled-in documentation and the figure; validator PASS; no CRLF, no cluster paths, no architecture.md / review/.
+- **Running on padum** (`~/scratch/amlc_v10only`, ETA ~18:00): final-dd's v10-only `reproduce.sh` from stage 2 on, on
+  the rerun's first half. **User decision (12:50): its output files replace the variant in the package** once it
+  finishes and checks out; the leaderboard upload must then be that file too. Its candidate set is the rerun's
+  (13,377,149 pairs, 7.72 per S1), so the documentation's candidate numbers change with it.
+- **Reproducibility:** a from-scratch rerun of dd matched every stage's validation within 0.0001 and 98.9% of S1 rows
+  (entry 11:50); GPU training is not bit-exact.
+- **Before the final submission:** checklist in [SUBMISSION_NOTES.md](SUBMISSION_NOTES.md).
+
+## 2026-09-27 13:20 — documentation written; figure corrected; where v10's validation F0.5 is lost
+- **`final-dd:ber/Documentation_template.md`** (db4d351): the organisers' sections filled in for variant_v10seed_dd
+  (EDA findings, blocking with recall tables, 72 features, model stack, threshold, error analysis, LB progression,
+  code map, compliance). It embeds `pipeline.png`, which `package.sh` copies next to it.
+- **Figure fixes** (checked against the code): the LLM judge trains on 120k best pairs of folds 4-7, 80% with an
+  unsure stage-1 p and 20% sure (it said "120k unsure"); the self-training box now says round 1 is seeded by stage 2,
+  round k by stage 2 vetoed by the rounds before k. Every other number in it matches the code (45 + 17 + 10 = 72
+  features, HNSW M 32 / efSearch 512, lexicon cosine 0.9, band 0.01-0.99, LoRA r 16, 3M + 4M self-training pairs).
+  Rendered with draw.io's viewer in headless Chrome, cropped to the diagram.
+- **`x_verr.py _v10p 0.70`** (v10 stage 2, validation 0.99262), gain if each error type were fixed:
+
+  | error | rows | gain | empty address | namesake S1s |
+  |---|---|---|---|---|
+  | missed true match | 8,829 | +0.00208 | 75% | 78% |
+  | accepted distractor | 524 | +0.00054 | 46% | 49% |
+  | accepted wrong S1 | 741 | +0.00044 | 72% | 67% |
+
+  A threshold per bucket (empty address, namesakes, added / dropped word, source, singletons) gains +0.00000. The
+  loss is information-limited: empty-address records whose name several S1s share. Sampled examples in padum
+  `work/logs/v10p_errex.log`.
 
 ## 2026-09-27 11:50 — end-to-end rerun of `final-dd` done: dd reproduced (not byte for byte); HEAD's last steps identical
 - **Rerun** (padum `~/scratch/amlc_final`, code a707292, empty work/, 03:03-11:34 on two to three A100s): dd md5
