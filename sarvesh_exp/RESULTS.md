@@ -22,10 +22,23 @@ change can only be judged on the leaderboard; for those we report how many Franc
 | E1 | US / India from the bge stack (v10b + LLM, `_v10bplw`); France unchanged | 2,255,799 / 2,751,628 / 859,338 | `ab07d90e` | bge stack +0.00011–0.00016 US/India validation | ✅ likely +0.0001 LB |
 | E1b | as E1 with the bge + LLM round-2 stack (`_v10bpl2w`) | 2,255,859 / 2,751,539 / 859,338 | `34173047` | ≈ E1 | ≈ E1 |
 | E2 | E1 + the bge stack as a 4th France veto | … / … / 855,682 (−3,656) | `7a35ceb9` | none (France) | ❓ LB only; vetoes have helped before |
-| E3 | E1, France base from bge + LLM round 2 | … / … / 856,838 (−2,500) | pending | none (France) | ❓ LB only |
-| E4a / E4b | E1, France threshold 0.65 / 0.75 | pending | | none (France) | ❓ LB only |
+| E3 | E1, France base from bge + LLM round 2 | … / … / 856,838 (−2,500) | `f8466461` | none (France) | ❓ LB only |
+| E4a | E1, France threshold 0.65 (instead of 0.70) | … / … / 860,784 (+1,446) | pending | none (France); US/India validation is flat 0.60–0.70 | ❓ LB only |
+| E4b | E1, France threshold 0.75 | pending | | none (France) | ❓ LB only |
 | E5 | E1 with the generic France fixes (`rule_fr` + `x_ddfix`) instead of the variant's lists | pending | | compares generic vs variant lists | compliance check |
-| E7 | US / India from the mean of the bge and main stacks | pending | | US / India validation | pending |
+| E7 | US / India from the **mean** of the bge and main stacks | 2,255,059 / 2,751,092 / 859,338 | | validation 0.99279 < bge alone 0.99283 | ❌ **does not work**: averaging is worse than bge alone |
+
+## US / India validation (labels; entity folds 8-9, distractors weighted, copy-free), `exp3.py`
+
+| Stack (before the LLM blend) | 0.60 | 0.65 | **0.70** | 0.75 | 0.80 | US @0.70 | India @0.70 |
+|---|---|---|---|---|---|---|---|
+| main v10 (`_v10pw`) | 0.99259 | 0.99263 | 0.99262 | 0.99258 | 0.99248 | 0.99204 | 0.99349 |
+| **bge v10b (`_v10bpw`)** | 0.99283 | 0.99283 | **0.99283** | 0.99279 | 0.99272 | 0.99223 | 0.99374 |
+| mean of both | 0.99279 | 0.99280 | 0.99279 | 0.99273 | 0.99264 | 0.99218 | 0.99370 |
+
+- ✅ bge is better than the main stack by **+0.00021**, in both the US and India → E1.
+- ❌ averaging the two stacks does not help (below bge alone) → E7 dropped.
+- Threshold: 0.70 stays (bge flat 0.60–0.70, lower above).
 
 ## Earlier: candidate-set size (`cand_trim.py`, on the v9 shortlist = the same 12.76M pairs)
 Raising the shortlist cut-off from P ≥ 0.001: 0.003 → −8% pairs, cuts 782 of 5.88M accepted matches; 0.005 → −11%,
