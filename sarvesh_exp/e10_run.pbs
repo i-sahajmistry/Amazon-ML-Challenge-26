@@ -1,0 +1,27 @@
+#!/bin/bash
+#PBS -N e10
+#PBS -P scai
+#PBS -q scai_q
+#PBS -l select=1:ncpus=8:ngpus=1:mem=250gb
+#PBS -l walltime=04:00:00
+# E10 step 2: rebuild the bge stack (stage 1 -> stage 2 -> LLM blend) on the pairs with shortlist P >= TAU for US /
+# India (France keeps all). TAU=0.001 is the control (must reproduce validation 0.99283 / + LLM 0.99294).
+PY=$HOME/scratch/miniconda3/envs/amlc312/bin/python
+O=/scratch/scai/mtech/aib262144/AmazonMLChallenge/work
+R=/scratch/scai/mtech/aib262045/amlc_e10_$TAU
+set -e
+ln -sfn $HOME/scratch/amlc_data/student_resource $R/student_resource 2>/dev/null || { mkdir -p $R; ln -sfn $HOME/scratch/amlc_data/student_resource $R/student_resource; }
+export PYTHONPATH=$HOME/scratch/ber_gen_code/ber/src OMP_NUM_THREADS=8 NT=8
+$PY -u $HOME/scratch/exp/e10_prep.py $TAU $R
+for f in pq lexicon.json imitated_train.npy cand_train.parquet cand_test.parquet; do [ -e $R/work/$f ] || ln -s $O/$f $R/work/$f; done
+for f in llm_val_v10bp llm_test_v10bp; do ln -sfn $O/x/$f.parquet $R/work/x/$f.parquet; done
+export AMLC_ROOT=$R DFOLD=1
+cd $HOME/scratch/ber_gen_code/ber/src
+set +e
+echo "== stage 1 $(date +%T)"; CE_TAGS=_n10,_r10,_b10 TAG=_v10b S1K=3 $PY -u x_stage_multi.py s1 > $R/s1.log 2>&1 || { tail -20 $R/s1.log; exit 1; }
+echo "== stage 2 $(date +%T)"; CE_TAGS=_n10,_r10,_b10 TAG=_v10b BAG=5 PEERS=1 $PY -u x_nocopy.py test > $R/s2.log 2>&1 || { tail -20 $R/s2.log; exit 1; }
+grep -E "weighted-trained, copy-free" $R/s2.log
+echo "== LLM blend $(date +%T)"; $PY -u x_llmstack.py _v10bp _v10bp > $R/llm.log 2>&1 || { tail -20 $R/llm.log; exit 1; }
+grep -E "stage-2 .*LLM" $R/llm.log
+echo "pairs test: $($PY -c "import pandas as pd; print(len(pd.read_parquet('$R/work/feats2_test.parquet')))")"
+echo "done $(date +%T)"

@@ -26,13 +26,13 @@ md5 e73c409e. Each item: what, evidence, how to apply, decision rule. Details an
    0.625 0.99223 = 0.70 0.99223; India best 0.675 0.99375 vs 0.70 0.99374). Keep 0.70 for every country.
 7. **OPTIONAL, LEADERBOARD-ONLY — E9: France base from the bge + LLM stack** (same 3 vetoes and fixes): France 857,002
    (−2,336), md5 ae0ecb86, PASS.
-8. **KEY FINDING (E11) — why US / India score lower on the leaderboard than on validation:** test has ~3× more
-   *sparse* S1s (claimed by only 1–4 records: 27% of test S1s vs 8% of validation), and the model is weakest exactly
-   there (validation F0.5 0.958–0.988 vs 0.994–0.995 for S1s with 6+ claimants). Reweighting validation to test's
-   claimant mix: US+India 0.99283 → **0.98893** (US 0.99223 → 0.98581, India 0.99374 → 0.99171). Right direction and
-   enough to explain the ~0.001 gap (it overshoots, likely because validation distractors were counted with their
-   weight). Lead: sparse S1s prefer a lower threshold (0.5: +0.0013 / +0.0016 within the 2- and 4-claimant groups).
-   E12 (running) tests a claimant-count threshold cross-fitted on validation.
+8. **CORRECTED — E11 does NOT explain the US / India validation-vs-leaderboard gap (E12).** E11 suggested test has 3×
+   more sparse S1s (1–4 claimants) where the model is weak. That was an **artifact**: E11 counted validation distractors
+   with their ×3 weight. Counting the same way on both sides (strong claimants, q ≥ 0.5, unweighted), test's mix
+   matches validation: US+India test-like 0.99283 = validation 0.99283 (US 0.99225 vs 0.99223, India 0.99371 vs
+   0.99374). The gap's cause is unknown (and the ~0.9915 LB estimate for US / India is itself soft).
+   **DO NOT APPLY — threshold per crowding level:** cross-fitted gain +0.00005 / +0.00010 (mean +0.00008), and the
+   best thresholds flip between folds for 3 of 7 groups: noise-level.
 9. **PENDING:** E10 (smaller candidate set for US / India, validated) — step 1 running.
 
 
@@ -81,7 +81,7 @@ From the team's `compare.py` (pairs = accepted record → S1 links).
 F0.5 break-even for a France removal: it helps if the removed pairs are more than ~30% wrong (precision-weighted metric);
 past France vetoes removed mostly decoys. Additions help only if they are more than ~70% right.
 
-## E11: validation vs test, by how many records claim each S1 (`exp5.py`)
+## E11 (SUPERSEDED by E12 — artifact of weighted counting): validation vs test, by how many records claim each S1 (`exp5.py`)
 Claimants = records whose best S1 it is (label-free, exists on test). Validation counts distractors with their weight.
 
 | claimants | US val / test share | US val F0.5 | India val / test share | India val F0.5 |
