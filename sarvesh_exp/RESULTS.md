@@ -7,16 +7,19 @@ changes; E16 alone was +0.0002 on US / India validation.
 TRY (in this order):
 1. **E17** (`out_E17`, md5 `eb6fdbec`): E16 on a 5.8% smaller candidate set (12.02M pairs). Why: same validation as E16,
    smaller candidate file ranks higher.
-2. **France rescue (E30, building)**: the empty-S1 rescue that helped US / India has never been applied to France
-   (312 France S1s at t = 0.5). Why: same principle; E21 shows France empty S1s 6.2% vs US/India 5.8%. LB-only.
-3. **E19 / E31**: + bge stack as a 4th France veto. Why: E23 shows the vetoed France pairs are decoy-like (house-number
+2. **E30 — France rescue** (`out_E30`, md5 `88ed83ae`, PASS; `exp22.py`): E17 + the empty-S1 rescue applied to France
+   too (an empty France S1 takes its best claimant if q ≥ 0.5): **312 France S1s filled**, nothing else changes.
+   Why: the rescue is validated on US / India (+0.00009) and was part of E16, which moved the LB; France never had it.
+   LB-only. Bolder: **E30b** t = 0.4 (439 S1s, md5 `f4ef0c2a`).
+3. **E19 / E31**: + bge stack as a 4th France veto (E31 = E19 + France rescue, 266 S1s, md5 `d9211e73`, PASS). Why: E23 shows the vetoed France pairs are decoy-like (house-number
    conflict 25% vs 4% in kept pairs), and vetoes have helped France on the LB before. LB-only.
 
 AVOID (validated on US / India, all ≤ 0 or noise): stack averaging (E7), per-country / per-crowding thresholds (E8,
 E12), lone-match drop (E13b), sibling rule (E15), stage-2 tuning bigger trees / lower lr (E18), expected-F0.5 per S1
 (E20, worse than the simple rescue), second-model veto on US / India (E25), exact / fuzzy name rules for name-only
 records (E26 / E28: their misses are ambiguous, not fixable), house-number rules for US / India (E23: accepted test
-pairs already look like true matches). Do not chase a "France recall gap" (E21 / E22: France just has smaller clusters).
+pairs already look like true matches). Invented-name records → match by address (E33: −0.00007; those records are
+already found 97.8% of the time, the extra address matches are only 67% right). Do not chase a "France recall gap" (E21 / E22: France just has smaller clusters).
 
 ## FOR THE FINAL BUILD — read this first (kept current)
 Written for whoever builds the final file (team or their assistant). Baseline = `variant_v10seed_dd`, LB 0.990349,
