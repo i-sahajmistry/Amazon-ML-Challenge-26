@@ -40,7 +40,10 @@ md5 e73c409e. Each item: what, evidence, how to apply, decision rule. Details an
    **Ready-made file = E16** (E1 + this rescue, `exp9.py`): 666 S1s rescued (US 369, India 297, one record each),
    US / India / France accepted 2,256,168 / 2,751,925 / 859,338, matching md5 **`a019f175`**, candidate_pairs
    `1a8b4f5c` (unchanged), validator `--check-ids` **PASS**. France byte-identical to the variant.
-   **This is the best validated file we have (E1 + rescue ≈ +0.0002 US / India validation over the 0.990349 file).**
+   **This is the best validated file we have.** Caveat: E1 (+0.00012) and the rescue (+0.00009) were each measured
+   alone; the rescue was measured on the stage-2 q (before the LLM blend), and the combination was not scored
+   jointly (no validation q with the LLM blend is saved), so "+0.0002" is an estimate, possibly less if they overlap.
+   US + India are 85% of S1s → expected LB ≈ +0.00015–0.0002 if validation transfers.
 10. **DO NOT APPLY — drop a lone medium-confidence match (E13b):** negative for every t (−0.00003 … −0.00064).
 11. **WHERE US / INDIA LOSE (E14, validation 0.99283, loss 0.00717):** missed some true matches 0.00470 (66%), S1 left
     empty although it has matches 0.00152 (21%), distractor merged 0.00045, wrong-S1 record merged 0.00041,
@@ -55,7 +58,8 @@ md5 e73c409e. Each item: what, evidence, how to apply, decision rule. Details an
     US / India validation at 0.70, same code both sides: control **0.99289** vs smaller set **0.99287** (+LLM;
     stage 2 alone 0.99274 vs 0.99277). The difference (−0.00002) is below rerun noise (this control gives 0.99289 vs
     Sahaj's 0.99294 for the same setup). **Use it only if the smaller candidate file matters for ranking**; it
-    needs the US / India test q from the smaller run plus the rescue re-applied — **file not built yet**.
+    needs the US / India test q from the smaller run plus the rescue re-applied — **building as E17** (`exp10.py`,
+    job 1067974): E16 on the smaller candidate set.
 
 
 Not part of the submission package (this folder is outside `ber/`). Scripts here are exactly what ran on padum.

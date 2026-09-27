@@ -1,0 +1,24 @@
+#!/bin/bash
+#PBS -N exp_e17
+#PBS -P scai
+#PBS -q scai_q
+#PBS -l select=1:ncpus=1:ngpus=1:mem=80gb
+#PBS -l walltime=00:40:00
+# E17 = E16 (E1 + empty-S1 rescue) on the E10 smaller candidate set (US / India shortlist P >= 0.005, France all).
+PY=$HOME/scratch/miniconda3/envs/amlc312/bin/python
+R=/scratch/scai/mtech/aib262045/amlc_e10_0.005; X=$R/work/x; E=/scratch/scai/mtech/aib262045/amlc_exp
+REF=/scratch/scai/mtech/aib262144/amlc_variant/output_variant_dd/matching_results.tsv
+export AMLC_ROOT=$R OMP_NUM_THREADS=1 PYTHONPATH=$HOME/scratch/ber_gen_code/ber/src
+for f in test_q_v10plw test_q_a1pw test_q_a2pw test_q_a3pw restore_fr_dd reject_fr_dd; do ln -sfn $(readlink -f $E/work/x/$f.parquet) $X/$f.parquet; done
+cd $HOME/scratch/ber_gen_code/ber/src
+$PY -u $HOME/scratch/exp/exp10.py
+ln -sfn $X/p5_test_v10b.parquet $X/p5_test_resc17.parquet
+echo "===== E17: E16 on the smaller candidate set"
+FROM=unlabelled:_v10plw,unlabelled:_a1pw:min,unlabelled:_a2pw:min,unlabelled:_a3pw:min RESTORE=restore_fr_dd REJECT=reject_fr_dd \
+  $PY -u x_final.py $E/out_E17 _resc17 0.70 2>&1 | grep -E "^thr|restore|reject|Error|Traceback"
+(cd $E/student_resource && $PY utils/validate_submission.py --check-ids --test-dir dataset/test --matching $E/out_E17/matching_results.tsv --candidate $E/out_E17/candidate_pairs.tsv 2>&1 | grep -E "PASS|FAIL|rror")
+md5sum $E/out_E17/*.tsv
+echo "candidate pairs: $(awk -F'\t' 'NR>1{n+=split($2,a,",")}END{print n}' $E/out_E17/candidate_pairs.tsv) (E16: $(awk -F'\t' 'NR>1{n+=split($2,a,",")}END{print n}' $E/out_E16/candidate_pairs.tsv))"
+echo "--- vs variant"; (cd $E && $PY compare.py $E/out_E17/matching_results.tsv $REF 2>&1 | tail -5)
+echo "--- vs E16";     (cd $E && $PY compare.py $E/out_E17/matching_results.tsv $E/out_E16/matching_results.tsv 2>&1 | tail -5)
+echo "done $(date +%T)"
