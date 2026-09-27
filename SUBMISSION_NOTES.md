@@ -22,7 +22,8 @@ Deadline 27 Sep 23:59 IST (confirm on the portal that the zip has the same deadl
 ## To do
 - [x] **Final file** (27 Sep 15:46): **E16fr3, leaderboard 0.990807** (matching_results e93605ad, candidate_pairs
       1a8b4f5c = the variant's, 12,760,925 pairs, 7.37 per S1). final-dd d7db51d (pushed) builds its method (bge
-      lane, `x_recall.py`); README, documentation and figure updated. Package rebuilt from a clean export of d7db51d:
+      lane, `x_recall.py`); README, documentation and figure updated; fefa59e applies Sarvesh's doc review
+      (DOC_REVIEW.md: table fix, +0.0081, error-table scope, veto validated on the LB). Package rebuilt from fefa59e:
       `submission/SSM_submission.zip` (122 MB, 33 entries, validator --check-ids PASS, no CRLF, no cluster paths, no
       architecture.md / review/ / notes). This upload is the last one (user): it is the final leaderboard file.
 - [x] **`final-dd` builds the variant's pipeline** (171c552): `reproduce.sh` is v10 only, no v8 / v9 stacks; the
