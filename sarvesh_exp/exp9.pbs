@@ -1,0 +1,20 @@
+#!/bin/bash
+#PBS -N exp_e16
+#PBS -P scai
+#PBS -q scai_q
+#PBS -l select=1:ncpus=1:ngpus=1:mem=80gb
+#PBS -l walltime=00:40:00
+PY=$HOME/scratch/miniconda3/envs/amlc312/bin/python
+R=/scratch/scai/mtech/aib262045/amlc_exp; X=$R/work/x; O=/scratch/scai/mtech/aib262144/AmazonMLChallenge/work
+REF=/scratch/scai/mtech/aib262144/amlc_variant/output_variant_dd/matching_results.tsv
+export AMLC_ROOT=$R OMP_NUM_THREADS=1 PYTHONPATH=$HOME/scratch/ber_gen_code/ber/src
+cd $HOME/scratch/ber_gen_code/ber/src
+$PY -u $HOME/scratch/exp/exp9.py
+ln -sfn $O/x/p5_test_v10b.parquet $X/p5_test_resc16.parquet
+echo "===== E16: E1 + empty-S1 rescue (US / India), France as the variant"
+FROM=unlabelled:_v10plw,unlabelled:_a1pw:min,unlabelled:_a2pw:min,unlabelled:_a3pw:min RESTORE=restore_fr_dd REJECT=reject_fr_dd \
+  $PY -u x_final.py $R/out_E16 _resc16 0.70 2>&1 | grep -E "^thr"
+(cd $R/student_resource && $PY utils/validate_submission.py --check-ids --test-dir dataset/test --matching $R/out_E16/matching_results.tsv --candidate $R/out_E16/candidate_pairs.tsv 2>&1 | grep -E "PASS|FAIL")
+md5sum $R/out_E16/*.tsv
+(cd $R && $PY compare.py $R/out_E16/matching_results.tsv $REF 2>&1 | tail -5)
+echo "done $(date +%T)"

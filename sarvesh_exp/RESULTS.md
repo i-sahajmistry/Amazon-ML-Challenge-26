@@ -37,6 +37,10 @@ md5 e73c409e. Each item: what, evidence, how to apply, decision rule. Details an
    record takes its best claimant if that record's q ≥ 0.5. Cross-fitted on validation (fit one entity fold, score
    the other): **+0.00008 and +0.00010, mean +0.00009, both folds pick t = 0.5** (every t in 0.4–0.65 positive).
    Stacks with E1: together ≈ +0.0002 on US / India validation. (E15 re-check of E13a with the same code: +0.00009.)
+   **Ready-made file = E16** (E1 + this rescue, `exp9.py`): 666 S1s rescued (US 369, India 297, one record each),
+   US / India / France accepted 2,256,168 / 2,751,925 / 859,338, matching md5 **`a019f175`**, candidate_pairs
+   `1a8b4f5c` (unchanged), validator `--check-ids` **PASS**. France byte-identical to the variant.
+   **This is the best validated file we have (E1 + rescue ≈ +0.0002 US / India validation over the 0.990349 file).**
 10. **DO NOT APPLY — drop a lone medium-confidence match (E13b):** negative for every t (−0.00003 … −0.00064).
 11. **WHERE US / INDIA LOSE (E14, validation 0.99283, loss 0.00717):** missed some true matches 0.00470 (66%), S1 left
     empty although it has matches 0.00152 (21%), distractor merged 0.00045, wrong-S1 record merged 0.00041,
@@ -45,7 +49,13 @@ md5 e73c409e. Each item: what, evidence, how to apply, decision rule. Details an
 12. **DO NOT APPLY — "sibling" rule (E15):** accepting records with t ≤ q < 0.70 when their S1 already has an
     accepted record with q ≥ 0.9–0.99 is negative for every setting (−0.00002 … −0.00118); combined with the rescue it
     is worse than the rescue alone (+0.00001). The missed matches are genuinely ambiguous.
-13. **PENDING:** E10 (smaller candidate set for US / India, validated) — step 1 running.
+13. **OPTIONAL (blocking) — smaller candidate set for US / India costs nothing measurable (E10).** Shortlist cut-off
+    for US / India raised 0.001 → 0.005 (France keeps all its pairs), whole chain retrained (stage 1 → stage 2 → LLM
+    blend on the bge stack). Test candidate_pairs **12,760,925 → 12,020,996 (−739,929, −5.8%)**; train −7.2%.
+    US / India validation at 0.70, same code both sides: control **0.99289** vs smaller set **0.99287** (+LLM;
+    stage 2 alone 0.99274 vs 0.99277). The difference (−0.00002) is below rerun noise (this control gives 0.99289 vs
+    Sahaj's 0.99294 for the same setup). **Use it only if the smaller candidate file matters for ranking**; it
+    needs the US / India test q from the smaller run plus the rescue re-applied — **file not built yet**.
 
 
 Not part of the submission package (this folder is outside `ber/`). Scripts here are exactly what ran on padum.
@@ -76,6 +86,8 @@ change can only be judged on the leaderboard; for those we report how many Franc
 | E5 | E1 with the generic France fixes (`rule_fr` + `x_ddfix`, `unlabelled`) instead of the variant's lists | 2,255,799 / 2,751,628 / 859,338 | `ab07d90e` (= E1) | lists pair-for-pair identical to the variant's (restore 32,620, reject 11,105) | ✅ **compliance: generic code gives the identical file** |
 | E8 | per-country thresholds (US / India validation, bge stack) | — | — | +0.00001 at best (US 0.625, India 0.675) | ❌ **does not work** |
 | E9 | France base from the bge + LLM stack, same vetoes + fixes | … / … / 857,002 (−2,336) | `ae0ecb86` | none (France) | ❓ LB only |
+| E16 | E1 + rescue empty S1s at q ≥ 0.5 (US / India) | 2,256,168 / 2,751,925 / 859,338 | `a019f175` | validation E1 +0.00012, rescue +0.00009 cross-fitted; 666 S1s rescued | ✅ **best validated file**, PASS |
+| E10 | US / India shortlist cut-off 0.005 (−5.8% test pairs), full retrain | (not built) | — | validation +LLM 0.99287 vs control 0.99289 | ✅ no measurable cost; optional, for a smaller candidate file |
 | E7 | US / India from the **mean** of the bge and main stacks | 2,255,059 / 2,751,092 / 859,338 | | validation 0.99279 < bge alone 0.99283 | ❌ **does not work**: averaging is worse than bge alone (file `138c24f2` built, PASS, not to be used) |
 
 ## Per-country comparison against the variant (0.990349): what each file changes
@@ -125,13 +137,18 @@ Best threshold per group (US+India validation): 2 claimants 0.5 (+0.00132), 3: 0
 - With the LLM blend (Sahaj's `x_llmstack__v10bp__v10bp.log`): bge + LLM **0.99294** at 0.70 (0.60 0.99289, 0.65 0.99291,
   0.75 0.99290, 0.80 0.99282); the variant's main + LLM stack 0.99282. So E1's US/India gain is +0.00012.
 
-## E10 (running): smaller candidate set for the countries with labels
+## E10: smaller candidate set for the countries with labels (`cand_p.py`, `e10_prep.py`, `e10_run.pbs`)
 The organisers rank a smaller candidate_pairs.tsv higher, and it must be exactly what the first model scored, so a
-smaller set means re-scoring. Plan: keep France's list (its namesake competition matters; Sahaj's `tight_dd` lost
-France matches), raise the shortlist cut-off for US / India only (P ≥ 0.003 / 0.005), re-run stage 1 → stage 2 → LLM
-blend on the smaller set, and measure the US / India validation cost against the pairs saved.
-- Step 1 (`cand_p.py`): the shortlist probability of every scored pair, train + test → `x/shortP_{split}.npy`.
-- Expected from `cand_trim.py`: at 0.005, US 6.58 → 6.29 and India 7.14 → 6.46 pairs per S1 (≈ −0.7M pairs, −5.5%).
+smaller set means re-scoring. France keeps its list (Sahaj's `tight_dd` lost France matches); US / India shortlist
+cut-off raised to P ≥ 0.005; stage 1 (bge stack, S1K=3) → stage 2 (BAG=5, peers) → LLM blend rerun on the smaller
+set. Control = the same run at P ≥ 0.001 (all pairs), so both sides share the code and the randomness.
+
+| | train pairs | test pairs | stage 2, 0.70 | + LLM, 0.65 | + LLM, 0.70 | + LLM, 0.75 |
+|---|---|---|---|---|---|---|
+| control (P ≥ 0.001) | 12,929,263 | 12,760,925 | 0.99274 | 0.99287 | **0.99289** | 0.99285 |
+| smaller (P ≥ 0.005) | 12,003,540 (−7.2%) | 12,020,996 (−5.8%) | 0.99277 | 0.99288 | **0.99287** | 0.99282 |
+
+Verdict: −739,929 test pairs for −0.00002 validation at 0.70, i.e. no measurable cost. Runtime ≈ 35 min per run on 1 GPU.
 
 ## Earlier: candidate-set size (`cand_trim.py`, on the v9 shortlist = the same 12.76M pairs)
 Raising the shortlist cut-off from P ≥ 0.001: 0.003 → −8% pairs, cuts 782 of 5.88M accepted matches; 0.005 → −11%,
