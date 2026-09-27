@@ -1,0 +1,12 @@
+#!/bin/bash
+#PBS -N exp_e21
+#PBS -P scai
+#PBS -q scai_q
+#PBS -l select=1:ncpus=2:ngpus=1:mem=100gb
+#PBS -l walltime=00:45:00
+PY=$HOME/scratch/miniconda3/envs/amlc312/bin/python
+export AMLC_ROOT=/scratch/scai/mtech/aib262045/amlc_e10_0.005 OMP_NUM_THREADS=2 PYTHONPATH=$HOME/scratch/ber_gen_code/ber/src DFOLD=1
+cd $HOME/scratch/ber_gen_code/ber/src
+FROM=unlabelled:_v10plw,unlabelled:_a1pw:min,unlabelled:_a2pw:min,unlabelled:_a3pw:min SAVE_Q=_frchain $PY -u x_final.py x _resc17 0.70
+$PY -u $HOME/scratch/exp/exp13.py
+echo "done $(date +%T)"

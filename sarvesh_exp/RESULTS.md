@@ -74,6 +74,13 @@ md5 e73c409e. Each item: what, evidence, how to apply, decision rule. Details an
     `--check-ids` **PASS**. Final ranking = private score of the best public submission, so a worse upload costs
     only the slot. Top 3 is 0.99117 (+0.00082 over us); validated changes give ≈ +0.0002, so a France change is the
     only lever big enough to matter.
+16. **DO NOT APPLY — expected-F0.5 decision per S1 (E20, `exp12.py`):** for each S1, accept the top k claimants that
+    maximise the expected F0.5 (Monte Carlo on q, calibration sigmoid(a·logit q + b) cross-fitted). Cross-fitted
+    **+0.00004 vs 0.70 but −0.00005 vs 0.70 + rescue**; the simple rescue (item 9) is better. Does not work.
+17. **RUNNING — E21 France "shape" diagnostic (`exp13.py`):** France has no labels, but all countries' test sets come
+    from one generator. Compare France's predicted share of empty S1s / matches per S1 with US / India truth (train)
+    and prediction (validation, test). If France has many more empty S1s, a France rescue is the lever (the rescue
+    now runs for US / India only).
 
 
 ## Ready-made files on padum (read access granted to aib262144 via setfacl, incl. files written later)
