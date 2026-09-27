@@ -20,16 +20,18 @@ Deadline 27 Sep 23:59 IST (confirm on the portal that the zip has the same deadl
   weights, `student_resource/`.
 
 ## To do
-- [ ] **Final file** (user, 27 Sep 12:50): `variant_v10seed_dd` (LB 0.990349, md5 e73c409e) stays in the package
-      for now; it will be **replaced by the padum second-half check's output files** once that run finishes. Then the
-      final leaderboard upload must be that output too (the zip's matching_results.tsv byte-identical to it), and the
-      candidate set is the rerun's (~7.72 pairs per S1, not 7.37). Which upload counts for the private leaderboard:
-      decided later.
+- [x] **Final file** (27 Sep 15:46): **E16fr3, leaderboard 0.990807** (matching_results e93605ad, candidate_pairs
+      1a8b4f5c = the variant's, 12,760,925 pairs, 7.37 per S1). final-dd d7db51d (pushed) builds its method (bge
+      lane, `x_recall.py`); README, documentation and figure updated. Package rebuilt from a clean export of d7db51d:
+      `submission/SSM_submission.zip` (122 MB, 33 entries, validator --check-ids PASS, no CRLF, no cluster paths, no
+      architecture.md / review/ / notes). This upload is the last one (user): it is the final leaderboard file.
 - [x] **`final-dd` builds the variant's pipeline** (171c552): `reproduce.sh` is v10 only, no v8 / v9 stacks; the
       judge trains on v10's unsure records (the submitted file's judge used an older stage 1: README says so).
-- [ ] **Second-half check** (padum `~/scratch/amlc_v10only`, started 12:22, ETA ~18:00): the new `reproduce.sh` from
-      stage 2 on, on the rerun's files; compare with variant_v10seed_dd (validator, rows identical, F0.5, validation).
-      Then put its numbers in final-dd's README and rebuild the package.
+- [x] **Second-half check** (padum `~/scratch/amlc_v10only`, done 15:00): validator PASS, 98.86% of S1 rows as the
+      variant, F0.5 0.9977, every stage's validation within 0.0001 (findings 15:05). Put these numbers in final-dd's
+      README reproducibility bullet.
+- [ ] **bge chain on the check's files** (padum `~/scratch/amlc_v10only/bge.sh`, GPU C, ETA ~17:20): then build the
+      E16fr3 method there and compare with the shipped file (evidence for the new steps).
 - [x] **Reproducibility rerun** (done 11:34, findings 11:50): validator PASS, 98.9% of S1 rows as the submitted
       dd, validation equal; HEAD's last steps give the same file byte for byte. A rerun gives 7.72 candidate
       pairs per S1 (submitted 7.37): ship the submitted files and say this in the README.

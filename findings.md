@@ -3,25 +3,90 @@
 Newest first. Each entry: what was measured, the number, what it means. LB = public leaderboard; "val" = US/India
 validation (entity folds 8-9, distractors weighted to the test share of 39%, copy-free).
 
-## Current status for the team (read this first; updated 2026-09-27 13:20 IST)
-- **Best leaderboard: `variant_v10seed_dd`, 0.990349** (dd 0.990282, v10_fr3_llm 0.987071). File: Sahaj's PC
-  `submissions/variant_v10seed_dd/`, padum `~/scratch/amlc_variant/output_variant_dd/`; matching_results md5 e73c409e,
-  candidate_pairs md5 1a8b4f5c (= dd's: 12,760,925 pairs, 7.37 per S1); validator --check-ids PASS.
-- **What it is:** dd with the France chain rebuilt on v10 alone: v10 → three France self-training rounds seeded from
-  v10's own decisions (each a veto) → LLM judge on every unsure v10 row → France same-address fixes → threshold 0.70.
-  Commands as run: [ber/variant_v10seed_dd/](ber/variant_v10seed_dd/).
-- **Clean code: branch `final-dd`** (pushed): `reproduce.sh` builds the variant's pipeline from the provided zip, v10
-  only (no v8 / v9 stacks); no country names; seeds set. README, `Documentation_template.md` (filled in, team SSM:
-  Sahaj Mistry, Sarvesh Nikas, Mohanish Baviskar) and `pipeline.png` are on it.
-- **Package** `submission/SSM_submission.zip` (rebuilt 13:14 from final-dd db4d351): the variant's files, the code, the
-  filled-in documentation and the figure; validator PASS; no CRLF, no cluster paths, no architecture.md / review/.
-- **Running on padum** (`~/scratch/amlc_v10only`, ETA ~18:00): final-dd's v10-only `reproduce.sh` from stage 2 on, on
-  the rerun's first half. **User decision (12:50): its output files replace the variant in the package** once it
-  finishes and checks out; the leaderboard upload must then be that file too. Its candidate set is the rerun's
-  (13,377,149 pairs, 7.72 per S1), so the documentation's candidate numbers change with it.
+## Current status for the team (read this first; updated 2026-09-27 15:50 IST)
+- **Final file: E16fr3, leaderboard 0.990807** (new best; variant 0.990349; top 0.991811). `submissions/E16fr3/`:
+  matching_results e93605ad, candidate_pairs 1a8b4f5c. E1 (bge stack for US / India) + empty-S1 rescue + France
+  exact-name no-address restores + France rescue without the judge's "no" (entries 15:05 / 15:40 / 16:00).
+- **Code: final-dd d7db51d (pushed)** builds this method (bge lane, `x_recall.py`); README, documentation and figure
+  updated. **Package** `submission/SSM_submission.zip` rebuilt 15:46 with E16fr3's files; validator PASS.
+- The padum v10-only check (entry 15:05) is the reproducibility evidence; the bge chain on its files is running
+  (`~/scratch/amlc_v10only/bge.sh`) to rebuild E16fr3's method from the clean code as well.
 - **Reproducibility:** a from-scratch rerun of dd matched every stage's validation within 0.0001 and 98.9% of S1 rows
   (entry 11:50); GPU training is not bit-exact.
 - **Before the final submission:** checklist in [SUBMISSION_NOTES.md](SUBMISSION_NOTES.md).
+
+## 2026-09-27 16:00 — LB: E16fr3 = 0.990807 (+0.000458 over variant_v10seed_dd): new best, the final file
+- Expected 0.99067 (validation for US / India + hand review for France): the upload came in +0.00014 above it, so the
+  parts transfer at least in full (E1 + rescue expected +0.00016, France recall +0.00016).
+- The final submission ships this file (matching_results e93605ad, candidate_pairs 1a8b4f5c = the variant's) with
+  final-dd's code, which builds this method (bge lane, `x_recall.py`).
+
+## 2026-09-27 15:40 — one upload only: head-to-head hand check → E16fr3
+- **Against the earlier France hand review** (the 180 test groups behind the dd lists, `review/`; `~/scratch/review_cmp.py`):
+  E16 / E17 change none of the 180 S1s; **E19 changes 4 and all 4 are wrong** (removes Terroirs SA & Fils, OP SA + Fils,
+  Noura Industries SAS & Fils, Lamour Union SARL & Fils: DROPSUF records the review marked true); **E16fr3 / E16fr2 /
+  E17fr2 change 8**: two empty S1s filled correctly (Bordeaux Centre SAS ← alias "Drexarc Labs" at its exact address, the
+  review's wrongly vetoed ALIAS; Filles Comite SA ← "Filles Comite S.A.", review "likely true"), six no-address
+  additions to populated S1s that roughly cancel (three are the review's TWIN cases); **frB / frC / frD change the same 8
+  + 3**, all three expected losses (Vallee & Fils ← no-address record of an identically named twin on an S1 with no
+  same-address record; Comité des Ass ← "Comité des Ass SA", the twin's exact name; a reordered no-address name at ~70%).
+  The v10-only rerun differs on 5 (drops the alias Nylaevo and a "& Associés" suffix): slightly worse than the variant.
+- **Head-to-head samples** (`~/scratch/pairdiff.py`, 30 disputed S1s each, every record labelled, F0.5 per S1):
+  US / India E16fr3 vs E17 (6,989 S1s differ): a tie (net −0.03 over 30 S1s ≈ 0.000000 LB; E16fr3's extra are
+  no-address twins, E17's extra are number-shift + legal-change decoys). France frD vs E16fr3 (2,945 S1s differ): frD
+  worse on 23 of 30, net −1.71 over 30 ≈ **−0.0001 LB**; 19 of the 30 have an obvious twin S1 (same name elsewhere,
+  or only the legal form differs), and in two the record's legal form is the other S1's.
+- **Verdict:** E16fr3 ≈ E17fr2 (≈ 0.9907) > E16 ≈ E17 ≈ frD / frC / frB (≈ 0.9905) > variant (0.990349) > E19.
+  E17fr2 only adds a 5.8% smaller candidate set but needs three people's scripts ported; **upload E16fr3** (e93605ad).
+
+## 2026-09-27 15:05 — teammates' files verified and scored by hand review; E16fr3; the v10-only check reproduces the variant
+**Teammates' files, rebuilt from our own padum files** (sandbox `~/scratch/amlc_team`, code origin/variant-frC):
+Mohanish's frB 73b4a5ea and frC 7d66d4ea, Sarvesh's E16 a019f175: all byte-identical to theirs; E17 eb6fdbec, E19
+c91f83b1 and Mohanish's new frD 76ef7eea checked in their folders (ACL access). frD = E17 (US / India) + frB's France
+fixes; against my E17fr2 it differs only by 3,023 France additions (the core-name restores + the judge's "no" rescues).
+x_recall's rescue cannot move a record off another S1 (test_q holds one row per record, its argmax).
+
+**Where each change stands** (US / India: labelled validation; France: hand review of 30 sampled records per category
+in `review_dump.txt` from `~/scratch/review_dump.py`, discounted 10 points because on the one labelled category, the
+US / India rescue, my review said 75% true where the labels say 61%; LB Δ from `~/scratch/delta.py`, a per-S1 F0.5
+Monte Carlo over the touched S1s, other accepted records taken as true):
+
+| change | records | evidence | LB Δ |
+|---|---|---|---|
+| E1: bge + LLM stack for US / India | +5,677 / −4,418 | validation 0.99293 vs 0.99282 | +0.00010 |
+| empty-S1 rescue, US / India, q ≥ 0.5 (0.4) | 666 (923) | validation +0.00006 (+0.00007) on the bge stack | +0.00005 |
+| France no-address, exact name | 2,508 | review 84% true (legal-form-exact matches) | +0.00004 |
+| France no-address, core name only | 2,937 | review 60%: mostly twins (X SARL vs X SAS, same name at two addresses) | −0.00010 |
+| France empty-S1 rescue, q ≥ 0.4 | 439 | review 68%; the wrong ones are type-word swaps at the S1's address (judge −3 to −4) | +0.00009 |
+| same, without the judge's "no" (343) | 343 | review ~80% | +0.00012 |
+| E2: bge as a 4th France veto | −3,656 | 89% at the S1's address adding fils / groupe / et / développement / france (the suffix family dd showed ~97% true): review 80% true | −0.00005 to −0.00017 |
+
+**Expected LB** (variant 0.990349; each ±0.0001): E19 0.99038, frB 0.99046, E17 0.99048, E16 0.99050, frD 0.99051,
+frC 0.99054, E16fr 0.99063, E17fr2 0.99064, E16fr2 0.99066, **E16fr3 0.99067**. None reaches the top (0.991811).
+
+**New files** (all validator --check-ids PASS; France base = the variant's chain):
+- E16fr2 0e58a309: E16 + exact-name no-address restores + France rescue without the judge's "no" (France 862,151).
+- E17fr2 a6405af8: the same on E17 (candidate_pairs 15fb51cc, 12,020,996 pairs).
+- **E16fr3 e93605ad** (PC `submissions/E16fr3/`): E1 + final-dd's new `x_recall.py` (rescue q ≥ 0.40 in every country,
+  the judge must not say no where there are no labels; exact-name no-address restores): US 2,256,307, India 2,752,043,
+  France 862,152; 99.985% of S1 rows as E16fr2 (257 more US / India rescues at 0.4).
+
+**Checked and dropped:** ALIAS restores (made-up name at the S1's exact address): with a unique address France accepts
+96.8% (US 97.5%) and rejected ones are 3% true on US / India. France's empty-S1 share 6.16% vs US 5.87%, India 5.80%:
+no hidden recall hole. Records at another house number with the S1's exact name are 70-92% true in US / India, but
+France has a third as many per S1 and large number jumps: its generator adds less number noise; only ~1.3k are
+vetoed.
+
+**v10-only check done** (padum `~/scratch/amlc_v10only`, final-dd 171c552 from stage 2 on, rerun first half):
+matching c8bfd9be, candidate_pairs 66ba41e6 (13.38M), validator PASS; against the variant 98.86% of S1 rows identical
+(US 99.02%, India 99.22%, France 97.36%), F0.5 0.99767 / 0.99786 each way (France 0.9951); restore / reject 32,668 /
+11,110 (variant 32,620 / 11,105); round validations 0.99262 / 0.99259 / 0.99260 (probe 0.99257 / 0.99253 / 0.99261);
+LLM blend 0.99283 (0.99282). Same agreement as the dd rerun (98.88%, 0.99776).
+
+**final-dd (uncommitted):** `reproduce.sh` adds the bge lane on GPU C after the judge (x_ce3 CE_BASE=bge, 3M pairs,
+stages with the three CEs), `llm_stack_b` (x_llmstack _v10p _v10bp), and the final step
+`FROM=unlabelled:_v10plw,<vetoes> RESTORE=restore_dd,restore_empty,restore_nafr` on base `_v10bplw` after
+`x_recall.py _fin _v10p restore_dd reject_dd`. The bge chain is running on the check's files (`bge.sh`, GPU C).
 
 ## 2026-09-27 13:20 — documentation written; figure corrected; where v10's validation F0.5 is lost
 - **`final-dd:ber/Documentation_template.md`** (db4d351): the organisers' sections filled in for variant_v10seed_dd
