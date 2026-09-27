@@ -54,6 +54,21 @@ change can only be judged on the leaderboard; for those we report how many Franc
 | E5 | E1 with the generic France fixes (`rule_fr` + `x_ddfix`, `unlabelled`) instead of the variant's lists | 2,255,799 / 2,751,628 / 859,338 | `ab07d90e` (= E1) | lists pair-for-pair identical to the variant's (restore 32,620, reject 11,105) | ✅ **compliance: generic code gives the identical file** |
 | E7 | US / India from the **mean** of the bge and main stacks | 2,255,059 / 2,751,092 / 859,338 | | validation 0.99279 < bge alone 0.99283 | ❌ **does not work**: averaging is worse than bge alone (file `138c24f2` built, PASS, not to be used) |
 
+## Per-country comparison against the variant (0.990349): what each file changes
+From the team's `compare.py` (pairs = accepted record → S1 links).
+
+| File | US rows identical | India rows identical | France rows identical | France pairs added / removed | Kind of change |
+|---|---|---|---|---|---|
+| E1 (bge US/India) | 99.24% | 99.42% | **100%** | 0 / 0 | US/India only (validated +0.00012) |
+| E2 (+ bge 4th France veto) | = E1 | = E1 | 98.61% | **+0 / −3,656** | France precision only |
+| E3 (France base bge + LLM2) | = E1 | = E1 | 97.87% | +1,584 / −4,084 | France mixed |
+| E4a (France thr 0.65) | = E1 | = E1 | 99.45% | **+1,446 / −0** | France recall only |
+| E4b (France thr 0.75) | = E1 | = E1 | 99.25% | **+0 / −1,960** | France precision only |
+| E5 (generic fixes) | = E1 | = E1 | 100% | 0 / 0 | identical to E1 |
+
+F0.5 break-even for a France removal: it helps if the removed pairs are more than ~30% wrong (precision-weighted metric);
+past France vetoes removed mostly decoys. Additions help only if they are more than ~70% right.
+
 ## US / India validation (labels; entity folds 8-9, distractors weighted, copy-free), `exp3.py`
 
 | Stack (before the LLM blend) | 0.60 | 0.65 | **0.70** | 0.75 | 0.80 | US @0.70 | India @0.70 |
