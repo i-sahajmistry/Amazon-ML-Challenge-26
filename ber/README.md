@@ -6,36 +6,47 @@ runs it end to end from the provided data.
 
 ## Candidate on branch `E16fr3-sn` (not the shipped file)
 
-E16fr3 plus two France recall lists in `x_recall.py`. They apply only to the countries without training labels;
-US / India are unchanged. File: matching md5 `fdea1f55` (idea 1 alone: `519bc93e`), candidate_pairs `1a8b4f5c`
-(unchanged), validator PASS. France accepted 862,152 → 867,859 (+5,707).
+E16fr3 plus three France recall lists in `x_recall.py`. They apply only to the countries without training labels; US /
+India are unchanged, and candidate_pairs is unchanged (`1a8b4f5c`). All files pass the validator.
+
+| File | Lists | France accepted | matching md5 |
+|---|---|---|---|
+| E16fr3 (shipped) | – | 862,152 | `e93605ad` |
+| **E16fr3sncv** (our best + E49) | samename + nacore + llmveto | 869,277 (+7,125) | `25326508` |
+| E16fr3snc | samename + nacore | 867,859 (+5,707) | `fdea1f55` |
+| E16fr3cv (safer: without samename) | nacore + llmveto | 864,640 (+2,488) | `0d78cc27` |
 
 | List | Restores | Rule | Evidence |
 |---|---|---|---|
-| `restore_samename` | 4,646 | The S1's exact name at another house number; the only record of the S1 there; not 1–13 above the S1's number (the decoy shift); the LLM judge says yes | US / India validation: 97–98% true with no namesake S1, 68–78% with 3+ namesakes; almost never another namesake's record. Models accept 47–97% there, France 5–62%. France's rejected ones get the judge's yes 69–81% of the time, US / India's rejected ones 17–44%. |
+| `restore_samename` | 4,646 | The S1's exact name at another house number; the only record of the S1 there; not 1–13 above the S1's number (the decoy shift); the LLM judge says yes | US / India validation: 97–98% true with no namesake S1, 68–78% with 3+ namesakes. Models accept 47–97% there, France 5–62%. France's rejected ones get the judge's yes 69–81% of the time, US / India's rejected ones 17–44%. **Contested:** on US / India the *rejected* records of this kind are 0.2–2% true (Sarvesh's E41 / E42), and France's true matches rarely change house number. |
 | `restore_nacore` | 1,078 | No address; the S1's core name (legal form dropped), full name differs; no other S1 with that core name; judge yes | US / India validation: 98% true, and models accept 97.5–98.5%; France accepts 72.5%, so ≥ ~93% of its rejected ones should be true. With a core-name namesake: 44–48% true, so those are left out. |
+| `restore_llmveto` | 1,418 | Sarvesh's E49, France-safe part: accepted by the main stack + judge but removed by a self-training veto; judge margin ≥ 4; the record has no house number, or sits at the S1's number, adds a word and no decoy-like one | US / India validation: vetoed rows at margin ≥ 4 are 95% true (+0.00019). The France vetoes were confirmed on the leaderboard, so the parts that look like decoys are left out: another house number (772), and decoy-like, unedited or word-dropping same-address records (278). This is his `llmveto4n` minus those 278. |
 
 **Expected leaderboard change** (delta.py-style Monte Carlo over the touched S1s, by the share p of restores that are
-right; break-even p ≈ 0.67 / 0.70):
+right):
 
 | p | 0.60 | 0.70 | 0.80 | **0.90** | 0.95 |
 |---|---|---|---|---|---|
-| combined | −0.00007 | +0.00004 | +0.00016 | **+0.00027** | +0.00033 |
-| leaderboard | 0.99074 | 0.99085 | 0.99096 | **0.99108** | 0.99113 |
+| E16fr3sncv (all three lists) | −0.00009 | +0.00005 | +0.00020 | **+0.00034** | +0.00041 |
+| E16fr3snc | −0.00007 | +0.00004 | +0.00016 | +0.00027 | +0.00033 |
+| E16fr3cv (nacore + llmveto) | −0.00004 | +0.00001 | +0.00006 | +0.00011 | +0.00014 |
+| llmveto alone | −0.00002 | +0.00001 | +0.00004 | +0.00007 | +0.00008 |
 
 **Conclusions:**
-- Best estimate: +0.00016 to +0.00033, about 0.9911.
-  - `restore_nacore` is the safer list (p ≈ 0.93–0.98).
-  - `restore_samename` carries the risk (p ≈ 0.85–0.94). 75% of its candidates have generic names shared by 3+ S1s,
-    where US / India are only 68–78% true.
-- The leaderboard reads it clearly: the public-minus-private noise of this change is ~±0.00002.
-  - At or above +0.00005: the gain is real. Merge this branch into `final-dd` and rebuild the package.
-  - At or below E16fr3: France's rejections were mostly right. Stay on E16fr3.
+- Best estimate:
+  - E16fr3sncv: +0.0002 to +0.0004 (about 0.9911) if all three lists are ~80–95% right.
+  - E16fr3cv: the safer +0.0001 (about 0.9909).
+- The risk sits in `restore_samename` (4,646 of the 7,142 restores). Its true share could be anywhere from ~0.3
+  (E41 / E42: France is right to reject these) to ~0.9 (judge yes-rate, US / India base rates). At 0.5 it alone costs
+  about −0.00015.
+- `restore_nacore` and `restore_llmveto` rest on labelled evidence and on France-internal checks.
+- The leaderboard reads each file clearly: the public-minus-private noise is about ±0.00002.
+- Upload plan: E16fr3cv first. If it gains, upload E16fr3sncv: the difference measures `restore_samename`. Keep the
+  better one, merge this branch into `final-dd` with the matching `RESTORE=` list, and rebuild the package.
 - Reproducibility:
-  - Without the two lists, the code rebuilds E16fr3 byte for byte (`e93605ad`).
-  - On the clean v10-only rerun the lists give 3,412 + 1,059 restores, validator PASS. `restore_samename` moves
-    between GPU reruns because it only takes records the France chain rejected.
-- Even at the top of the range the file stays ~0.0007 below rank 1 (0.991829).
+  - Without the lists, the code rebuilds E16fr3 byte for byte (`e93605ad`).
+  - On the clean v10-only rerun, samename + nacore give 3,412 + 1,059 restores, validator PASS.
+- Even at the top of the range the file stays ~0.0006 below rank 1 (0.991829).
 
 Details: [description.md](description.md).
 

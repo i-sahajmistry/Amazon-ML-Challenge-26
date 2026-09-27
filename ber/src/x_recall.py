@@ -20,12 +20,20 @@
                     dropped) equals its S1's while the full name differs ("X SAS" for "X SARL"), no other S1 of the
                     country has that core name, and the judge accepts it. Without the namesake condition these were
                     ~60% true by hand review, mostly an "X SARL" record whose own S1 "X SAS" sits elsewhere.
+  restore_llmveto   countries without training labels (Sarvesh's E49, France-safe part): a record the main stack +
+                    judge accepts (x/test_q{VBASE}) but the self-training vetoes remove, restored when the judge's
+                    margin is >= 4 (US / India validation: vetoed rows at that margin are 95% true, +0.00019) and
+                    its house number fits: the record has none, or it sits at the S1's number, adds a word and no
+                    decoy-like one (x_ddfix's census). Records at another number are left out (the decoy cluster; on
+                    US / India the rejected same-name ones are 0.2-2% true, E41 / E42), as are unedited or
+                    word-dropping same-address records (their nD spread is decoy-like).
 Records the judge has not scored (stage-2 q outside its band) go to x/sn_rows.parquet: `ROWS=sn_rows python x_llm.py
 rows` scores them, then rerun this script.
 All lists leave out the pairs the same-address fixes reject.
-  python x_recall.py COMB LLM RESTORE REJECT   e.g. _fin _v10p restore_dd reject_dd
+  python x_recall.py COMB LLM RESTORE REJECT [VBASE]   e.g. _fin _v10p restore_dd reject_dd _v10plw
       COMB: x/test_q{COMB} (x_final.py SAVE_Q); LLM: x/llm_test{LLM}; RESTORE / REJECT: x_ddfix.py's lists
-      -> x/restore_empty.parquet, x/restore_nafr.parquet, x/restore_samename.parquet, x/restore_nacore.parquet
+      -> x/restore_empty.parquet, x/restore_nafr.parquet, x/restore_samename.parquet, x/restore_nacore.parquet,
+         x/restore_llmveto.parquet (with VBASE: the unlabelled countries' main stack + judge, before the vetoes)
          for x_final.py RESTORE=...
   python x_recall.py val [VQ]                  the empty-S1 rule on US / India validation (x/llm_val{VQ}), with labels"""
 import glob, sys, numpy as np, pandas as pd
@@ -36,9 +44,10 @@ from x_anatomy import first
 XD = f"{WORK}/x"
 T, TE = 0.70, 0.40
 SHIFT = (1, 13)   # the decoys' house-number shift above the S1's number
+LV = 4            # judge margin that overrules a self-training veto
 
 
-def lists(comb, llm, restore, reject):
+def lists(comb, llm, restore, reject, vbase=None):
     d = pd.read_parquet(f"{XD}/test_q{comb}.parquet")
     key = pd.MultiIndex.from_arrays([d.rid.values, d.sid.values])
     rj = pd.MultiIndex.from_frame(pd.read_parquet(f"{XD}/{reject}.parquet")[["rid", "sid"]])
@@ -61,6 +70,7 @@ def lists(comb, llm, restore, reject):
     twin = nn.reindex(pd.MultiIndex.from_arrays([d.c.values, t2.nn.values[d.rid.values]])).fillna(0).values >= 2
     same = t2.nn.values[d.rid.values] == t1.nn.values[d.sid.values]
     sel = unl & ~acc & noaddr & ~twin & same & (m > 0) & ~key.isin(rj)
+    nafr = sel
     d[sel][["rid", "sid"]].to_parquet(f"{XD}/restore_nafr.parquet")
     print("restore_nafr", int(sel.sum()), d[sel].c.value_counts().to_dict(), flush=True)
     # restore_samename: the exact name at another house number of the record's own (namesake S1s allowed: an
@@ -97,6 +107,28 @@ def lists(comb, llm, restore, reject):
     print(f"restore_nacore {int(sel.sum())} {d[sel].c.value_counts().to_dict()} (candidates {int(nc.sum())}, judge "
           f"yes {int(sel.sum())} / no {int((nc & (ms <= 0)).sum())}, not scored {int((nc & ~np.isfinite(ms)).sum())})",
           flush=True)
+    if vbase:
+        llmveto(d, key, unl, acc, rj, m, t1, t2, key.isin(pd.MultiIndex.from_frame(b[["rid", "sid"]])) | nafr, vbase)
+
+
+def llmveto(d, key, unl, acc, rj, m, t1, t2, placed, vbase):
+    from x_anatomy import positions
+    from x_ddfix import census, words
+    b0 = pd.read_parquet(f"{XD}/test_q{vbase}.parquet", columns=["rid", "sid", "q"])
+    qb = pd.Series(b0.q.values, index=pd.MultiIndex.from_frame(b0[["rid", "sid"]])).reindex(key).values
+    vet = unl & ~acc & (qb >= T) & ~key.isin(rj) & ~placed & (m >= LV)
+    keep = np.zeros(len(d), bool)
+    for c in sorted(set(d.c.values[vet])):
+        x = census(positions(d[d.c.values == c].assign(i=np.flatnonzero(d.c.values == c)), t1, t2))
+        w = words(x, 300)
+        dec = set(w[w.tv >= 0.20].index)
+        aw = x["add"].str.split().apply(set).values
+        ok = (x.b.values < 0) | ((x.pos.values == "SAME") & (x["add"].values != "") & np.array([not (a & dec) for a in aw]))
+        keep[x.i.values[ok]] = True
+    sel = vet & keep
+    d[sel][["rid", "sid"]].to_parquet(f"{XD}/restore_llmveto.parquet")
+    print(f"restore_llmveto {int(sel.sum())} {d[sel].c.value_counts().to_dict()} (vetoed with judge margin >= {LV}: "
+          f"{int(vet.sum())})", flush=True)
 
 
 def val(vq):
@@ -145,4 +177,4 @@ if __name__ == "__main__":
     if sys.argv[1] == "val":
         val(sys.argv[2] if len(sys.argv) > 2 else "_v10p")
     else:
-        lists(*sys.argv[1:5])
+        lists(*sys.argv[1:6])

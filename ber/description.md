@@ -101,3 +101,29 @@ The per-S1 F0.5 changes are summed over all 1,732,544 S1s (Monte Carlo, 60 draws
   - The risk is France's generic names: 75% of the candidates have 3+ namesake S1s, where US / India are 68–78% true.
 - **Split noise:** sd of the public-minus-private gain ~2.3e-5 (30% public share), so the leaderboard reads the result
   clearly.
+
+## Third list: restore_llmveto (Sarvesh's E49, France-safe part)
+
+France's decision is the minimum of the main stack + judge and three self-training stacks. The vetoes remove 25,686
+records the main stack + judge accepted. E49 restores those whose judge margin is at least m.
+
+- **US / India validation (Sarvesh, `exp36.py`):** the same chain vetoes 2,259 accepted rows, 83.7% of them true.
+  Restoring those at margin ≥ 4 gives rows that are 95% true, +0.00019.
+- **France:** the vetoes were confirmed on the leaderboard (+0.0033 over three rounds; per removed record, round 1 took
+  ~85% decoys and round 3 ~45%), so France's vetoed set is decoy-rich.
+- **Profile of the 2,469 France restores at margin ≥ 4:**
+  - no house number, same street: 843;
+  - the S1's number, suffix or neutral words: 576 (census 3–11% decoys);
+  - another house number: 772 (the decoy cluster, D, 323; other numbers 449);
+  - decoy-like, unedited or word-dropping same-address records: 278 (census decoy-rich).
+
+`restore_llmveto` keeps the first two groups: 1,418 restores. That is exactly Sarvesh's `llmveto4n` (number-compatible,
+1,696) minus the 278, and it overlaps neither of the other two lists. Expected: +0.00007 at 90% right.
+
+**Our idea 1 under E41 / E42.** On US / India the *rejected* same-name records at another house number are 0.2–2%
+true, and the dd analysis found France's true matches rarely change number. So France's rejections of
+`restore_samename`'s candidates may be right. The only evidence the other way is the judge's yes-rate, and our cut
+(margin > 0, median 1.75) is weak. It is therefore uploaded as a separate step (E16fr3cv → E16fr3sncv), so the
+leaderboard measures it.
+
+`reproduce.sh`: x_recall / x_recall2 take the France base `_v10plw` (VBASE); final adds `restore_llmveto`.
