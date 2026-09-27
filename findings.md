@@ -3,18 +3,28 @@
 Newest first. Each entry: what was measured, the number, what it means. LB = public leaderboard; "val" = US/India
 validation (entity folds 8-9, distractors weighted to the test share of 39%, copy-free).
 
-## Current status for the team (read this first; updated 2026-09-27 20:45 IST)
-- **Final file: C4, leaderboard 0.99084** (new best; E16fr3 0.990807; top ~0.992). `submissions/C4/`: matching_results
-  7c929413, candidate_pairs 1a8b4f5c. E16fr3 + four France recall lists for vetoed records of kinds the labelled
-  countries show are true (entries 20:30 / 20:45). It is the last upload.
-- **Code: final-dd 579db0d (pushed)** builds it (`x_recall.py`, `x_llm.py rows`, `reproduce.sh`); README,
-  documentation and figure updated. **Package** `submission/SSM_submission.zip` rebuilt 20:40 with C4's files;
-  validator PASS, audited.
-- The padum v10-only check (entry 15:05) is the reproducibility evidence; the bge chain on its files is running
-  (`~/scratch/amlc_v10only/bge.sh`) to rebuild E16fr3's method from the clean code as well.
+## Current status for the team (read this first; updated 2026-09-27 22:40 IST)
+- **Final file: C8, leaderboard 0.99091, rank 18** (C4 0.99084; E16fr3 0.990807; top ~0.992). `submissions/C8/`:
+  matching_results a7d37122, candidate_pairs 1a8b4f5c. It is the last upload.
+- **Code: final-dd a4c3fa1 (pushed)** builds it (`x_recall.py`: C4's lists + restore_alias, initials in restore_exact,
+  reject_decword; `reproduce.sh`). README / documentation not updated for C8 (user's call; they describe C4).
+  **Package** `submission/SSM_submission.zip` rebuilt 22:36 from a clean `git archive` of a4c3fa1; audited.
 - **Reproducibility:** a from-scratch rerun of dd matched every stage's validation within 0.0001 and 98.9% of S1 rows
   (entry 11:50); GPU training is not bit-exact.
 - **Before the final submission:** checklist in [SUBMISSION_NOTES.md](SUBMISSION_NOTES.md).
+
+## 2026-09-27 22:40 — LB: C8 = 0.99091 (rank 18), the final file; last ideas checked
+- **C8** = C4 + restore_alias (336: a made-up name at the S1's exact address, the only S1 there; main q >= 0.80, or
+  >= 0.10 with <= 2 made-up names at the S1) + initials there even where the main stack rejected them (56) −
+  Mohanish's reject_decword (157 France matches adding a census decoy-like word away from the S1's number). France
+  865,268. **0.99091** (+0.00007 over C4; expected ~+0.00004).
+- Checked and dropped (US / India labels): removing France matches at the decoy slot or 1-21 numbers above the S1
+  (the other team's claim: accepted ones there are 99.5-99.97% true); US / India empty-S1 threshold (0.40 is best:
+  +0.00007; 0.3 +0.00003, 0.5 +0.00006); more aliases (model-rejected below 0.10 or at shared addresses: 0-35%).
+- The other team's architecture (Global Optima, 0.990102): their alias rules add what our France chain already
+  accepts (81% of made-up names at the S1's address); only their guards (only S1 there, <= 2 made-up names) were new.
+- Ceiling tonight: post-processing is used up; 0.9915 needs +0.0044 France F0.5 (a France-specific main model or a
+  larger candidate set, 9-10 GPU h).
 
 ## 2026-09-27 20:45 — LB: C4 = 0.99084 (+0.000033 over E16fr3): new best, the final file; C5 not worth an upload
 - **C4 0.99084** vs E16fr3 0.990807: +0.000033, the low end of the expected range (0.99084-0.99096). By the per-S1
