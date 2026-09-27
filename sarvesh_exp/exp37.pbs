@@ -1,0 +1,17 @@
+#!/bin/bash
+#PBS -N exp_e50
+#PBS -P scai
+#PBS -q scai_q
+#PBS -l select=1:ncpus=4:ngpus=1:mem=90gb
+#PBS -l walltime=00:45:00
+PY=$HOME/scratch/miniconda3/envs/amlc312/bin/python
+E=/scratch/scai/mtech/aib262045/amlc_exp; B=/scratch/scai/mtech/aib262144/amlc_team/output_E16fr3; L=$E/lists
+export AMLC_ROOT=/scratch/scai/mtech/aib262045/amlc_e10_0.005 OMP_NUM_THREADS=4 PYTHONPATH=$HOME/scratch/ber_gen_code/ber/src DFOLD=1
+cd $HOME/scratch/ber_gen_code/ber/src
+$PY -u $HOME/scratch/exp/exp37.py $L || exit 1
+for m in 2 4 6; do
+  $PY -u $HOME/scratch/exp/patch_tsv.py $B $E/out_E16fr3_llmveto${m}n $L/add_llmveto${m}n.parquet || exit 1
+  (cd $E/student_resource && $PY utils/validate_submission.py --check-ids --test-dir dataset/test --matching $E/out_E16fr3_llmveto${m}n/matching_results.tsv --candidate $E/out_E16fr3_llmveto${m}n/candidate_pairs.tsv 2>&1 | grep -E "PASS|FAIL|rror")
+  md5sum $E/out_E16fr3_llmveto${m}n/matching_results.tsv
+done
+echo "done $(date +%T)"

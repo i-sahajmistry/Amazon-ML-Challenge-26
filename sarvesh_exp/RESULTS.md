@@ -28,7 +28,12 @@ LLM margin ≥ m, cross-fitted (fold 8 ↔ 9), **+0.00029** vs the chain (same a
 Caveat: on the LB the vetoes helped France (v9p → v10_fr3), so France's vetoed set is more decoy-rich than US / India's;
 the LLM margin is what separates them, hence a high cut. Files (E16fr3 + restores of records E16fr3 leaves unplaced;
 US / India untouched): `out_E16fr3_llmveto6` (safest), **`out_E16fr3_llmveto4` (recommended)**, `out_E16fr3_llmveto2`
-(boldest); md5s below once built. If France behaves like US / India, llmveto4 ≈ +0.0002–0.0004 overall.
+(boldest). **HOLD — do not upload these three yet:** hand check of 25 random llmveto4 France restores: ~11 clearly true
+(same address or alias: `CP` 30 R. des Meuniers for *Comité des Petanque*), ~8 the same generic name on the same street
+at a very different number (*Tourcoing Amicale* 211 vs 77 R Ingres — namesakes / decoys the vetoes rightly removed), 2–3
+type-word swaps at the same address (*Nantes Union* → *Nantes Societe*). **E50 (running)** keeps only restores whose house
+numbers agree or whose record has no number (all 11 true ones pass, all 8 number conflicts drop) → `out_E16fr3_llmveto{2,4,6}n`.
+Unfiltered md5s (for reference): llmveto2 `e15a2126` (+5,505), llmveto4 `6ab49633` (+2,469), llmveto6 `4236d873` (+633).
 
 **LEADERBOARD PROBES ON E16fr3 (ready to upload; US / India byte-identical to E16fr3, only France changes; all PASS
 `--check-ids`, candidate_pairs = E16fr3's `1a8b4f5c`; padum `/scratch/scai/mtech/aib262045/amlc_exp/out_<name>/`, each
