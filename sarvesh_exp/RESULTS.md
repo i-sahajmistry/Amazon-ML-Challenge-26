@@ -1,5 +1,26 @@
 # Experiments on top of the best file (Sarvesh, 27 Sep)
 
+## FOR THE FINAL BUILD — read this first (kept current)
+Written for whoever builds the final file (team or their assistant). Baseline = `variant_v10seed_dd`, LB 0.990349,
+md5 e73c409e. Each item: what, evidence, how to apply, decision rule. Details and all numbers further down.
+
+1. **APPLY — US / India from the bge stack (E1).** Evidence: labelled US / India validation at 0.70, bge + LLM stack
+   **0.99294** vs the variant's main + LLM stack **0.99282** (+0.00012; Sahaj's `x_llmstack__v10bp__v10bp.log`); better
+   in both countries. France untouched. Expected LB ≈ +0.0001.
+   How: base q = the bge + LLM stack instead of the main + LLM stack for countries with labels; France keeps the
+   variant's chain. With the variant's files (as run here, generic x_final of final-dd HEAD):
+   `FROM=unlabelled:_v10plw,unlabelled:_a1pw:min,unlabelled:_a2pw:min,unlabelled:_a3pw:min RESTORE=restore_fr_dd REJECT=reject_fr_dd python x_final.py OUT _v10bplw 0.70`
+   → md5 ab07d90e, validator --check-ids PASS, candidate_pairs unchanged (1a8b4f5c). In reproduce.sh this needs the
+   v10b steps (bge-reranker-v2-m3, Apache-2.0, 568M: fit + score + stages + llm_stack on v10b). Compliance: fine.
+2. **DO NOT APPLY — averaging the main and bge stacks (E7).** Validation 0.99279 < bge alone 0.99283.
+3. **DO NOT CHANGE the 0.70 threshold for US / India.** Validation flat 0.60–0.70 (bge + LLM best at 0.70).
+4. **OPTIONAL, LEADERBOARD-ONLY — France changes (no labels, cannot be validated):** E2 (bge as a 4th France veto,
+   −3,656 France matches), E3 (France base from bge + LLM round 2, −2,500), E4a / E4b (France threshold 0.65 / 0.75,
+   +1,446 / −1,960). Use only if a spare upload is available; past France vetoes helped, threshold moves are a guess.
+5. **PENDING:** E5 (generic `rule_fr` + `x_ddfix` lists vs the variant's lists — compliance), E8 (per-country
+   thresholds), E9 (France base from the bge stack), E10 (smaller candidate set for US / India, validated).
+
+
 Not part of the submission package (this folder is outside `ber/`). Scripts here are exactly what ran on padum.
 
 ## Baseline
