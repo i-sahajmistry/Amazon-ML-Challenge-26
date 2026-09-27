@@ -4,6 +4,9 @@ Match every Source 2 / Source 3 record to the Source 1 (reference) entity it bel
 This branch holds only the code that builds the submitted file **v10_fr3_llm_dd (leaderboard 0.990282)**, and
 `reproduce.sh`, which runs it end to end from the provided data.
 
+**Branch `variant-frB`:** also builds **variant_frB** (leaderboard pending) = variant_v10seed_dd (0.990349: the
+France self-training rounds seeded from v10) + two recall fixes (`x_recall.py`); see [variant_frB](#variant_frb).
+
 ## Pipeline
 
 Every S2/S3 record belongs to at most one S1 entity (training ground truth: 7.6M matched ids, none reused), so each
@@ -49,6 +52,15 @@ country or a language.
    models already get these right and the same fixes would hurt (`python x_ddfix.py check`: India would lose 0.0024),
    so they apply only to the countries without labels.
 10. **Decision** (`x_final.py`): accept a record when its score is ≥ 0.70, the same threshold for every country.
+11. **Recall fixes (variant_frB, `x_recall.py`)**:
+    - *Empty S1s* (all countries): an S1 with no accepted record takes its best candidate if its score is ≥ 0.40. An
+      S1 left empty scores 0 as soon as it has one true match; on US / India validation the rule gains +0.00009.
+    - *No-address records, countries without labels*: a rejected record with no address whose normalised name, or core
+      name, equals its S1's and no other S1's of the country, and that the LLM judge accepts. On US / India validation
+      such records are 96–98% (name) / 76–78% (core name) true and the models accept 95–98% / 68–70% of them; France
+      accepts 84% / 50%. French names reuse a small vocabulary, so a name-only match looks weak to models trained on
+      US / India. Where labels exist the rejected ones are mostly wrong (53–62% / 29–32% true), so this applies only to
+      the countries without labels.
 
 Folds: `crc32(S1 id) % 10`; 0–3 train the bi-encoder and the cross-encoders, 4–9 stages 1 and 2; stage 2 is validated
 on entity folds 8–9 after fitting on 4–7 (US / India validation F0.5 0.99282 for v10_fr3_llm).
@@ -57,7 +69,9 @@ on entity folds 8–9 after fitting on 4–7 (US / India validation F0.5 0.99282
 
 | File | Score |
 |---|---|
-| **v10_fr3_llm_dd** (this branch) | **0.990282** |
+| variant_frB (`variant-frB`: variant_v10seed_dd + `x_recall.py`) | pending |
+| **variant_v10seed_dd** (France rounds seeded from v10; `variant_v10seed_dd/variant.sh`) | **0.990349** |
+| v10_fr3_llm_dd (`reproduce.sh`) | 0.990282 |
 | v10_fr3_llm (`output_v10_fr3_llm`, also written by `reproduce.sh`) | 0.987071 |
 | v10_fr3 | 0.986077 |
 | v10_fr2 | 0.985942 |
@@ -83,3 +97,22 @@ AMLC_ROOT=/folder/with/student_resource GPU_A=0 GPU_B=1 bash reproduce.sh
 No external databases, APIs or lookup services are used at any stage, and there are no hand-written word lists:
 abbreviations, legal forms and word statistics are learned from the provided records (test records without labels,
 as allowed for unsupervised statistics), and self-training uses only the pipeline's own confident test decisions.
+
+## variant_frB
+
+variant_v10seed_dd is dd with the three France self-training rounds seeded from v10's own decisions and started from
+v10's cross-encoders (no v8 / v9 stacks), and the LLM judge's scores on every unsure v10 row;
+`variant_v10seed_dd/variant.sh` lists its steps as run on the original run's v10 files. variant_frB adds the two
+recall lists on top of it:
+```bash
+AMLC_ROOT=/variant/root bash variant_frB/frB.sh   # needs the variant's work/x (see the script's header)
+python src/x_recall.py val                        # the empty-S1 rule on US / India validation, with labels
+```
+| | US | India | France | md5 (matching_results) |
+|---|---:|---:|---:|---|
+| variant_v10seed_dd, accepted | 2,255,158 | 2,751,010 | 859,338 | e73c409e |
+| + empty-S1 rule (1,415 rows) | +546 | +430 | +439 | |
+| + no-address fix (5,445 rows, France; 48 already in the empty-S1 list) | | | +5,397 | |
+| **variant_frB**, accepted | 2,255,704 | 2,751,440 | 865,174 | **73b4a5ea** |
+
+candidate_pairs.tsv is unchanged (1a8b4f5c: 12,760,925 pairs, 7.37 per S1).
