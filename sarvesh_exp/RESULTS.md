@@ -22,8 +22,11 @@ md5 e73c409e. Each item: what, evidence, how to apply, decision rule. Details an
    scores, give restore / reject lists **pair-for-pair identical** to the variant's (32,620 / 32,620 and 11,105 /
    11,105, zero differences), and the file is **byte-identical** to E1 (md5 ab07d90e); E0 is byte-identical to the
    0.990349 file. So the final code can use the generic steps (`x_ddfix` + `unlabelled`) with no change in output.
-6. **PENDING:** E8 (per-country thresholds), E9 (France base from the bge stack), E10 (smaller candidate set for US /
-   India, validated).
+6. **DO NOT APPLY — per-country thresholds for US / India (E8).** Best cut on validation gains +0.00001 only (US best
+   0.625 0.99223 = 0.70 0.99223; India best 0.675 0.99375 vs 0.70 0.99374). Keep 0.70 for every country.
+7. **OPTIONAL, LEADERBOARD-ONLY — E9: France base from the bge + LLM stack** (same 3 vetoes and fixes): France 857,002
+   (−2,336), md5 ae0ecb86, PASS.
+8. **PENDING:** E10 (smaller candidate set for US / India, validated) — step 1 running.
 
 
 Not part of the submission package (this folder is outside `ber/`). Scripts here are exactly what ran on padum.
@@ -52,6 +55,8 @@ change can only be judged on the leaderboard; for those we report how many Franc
 | E4a | E1, France threshold 0.65 (instead of 0.70) | … / … / 860,784 (+1,446) | `a95424e3` | none (France); US/India validation is flat 0.60–0.70 | ❓ LB only |
 | E4b | E1, France threshold 0.75 | … / … / 857,378 (−1,960) | `010c7d23` | none (France) | ❓ LB only |
 | E5 | E1 with the generic France fixes (`rule_fr` + `x_ddfix`, `unlabelled`) instead of the variant's lists | 2,255,799 / 2,751,628 / 859,338 | `ab07d90e` (= E1) | lists pair-for-pair identical to the variant's (restore 32,620, reject 11,105) | ✅ **compliance: generic code gives the identical file** |
+| E8 | per-country thresholds (US / India validation, bge stack) | — | — | +0.00001 at best (US 0.625, India 0.675) | ❌ **does not work** |
+| E9 | France base from the bge + LLM stack, same vetoes + fixes | … / … / 857,002 (−2,336) | `ae0ecb86` | none (France) | ❓ LB only |
 | E7 | US / India from the **mean** of the bge and main stacks | 2,255,059 / 2,751,092 / 859,338 | | validation 0.99279 < bge alone 0.99283 | ❌ **does not work**: averaging is worse than bge alone (file `138c24f2` built, PASS, not to be used) |
 
 ## Per-country comparison against the variant (0.990349): what each file changes
