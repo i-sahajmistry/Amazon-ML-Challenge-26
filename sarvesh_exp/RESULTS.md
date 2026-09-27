@@ -100,6 +100,15 @@ md5 e73c409e. Each item: what, evidence, how to apply, decision rule. Details an
     vetoes mostly remove decoy-looking pairs, consistent with them helping on the leaderboard (supports E2 / E19).
 19. **DO NOT APPLY — stage-2 `lr` (0.025, BAG 10):** stage 2 0.70 0.99276 vs control 0.99274 (noise); stopped before
     the LLM blend.
+20. **E24 — where US / India validation loses true matches (`exp16.py`, 1,535,184 true pairs, recall 0.9801):**
+    not retrieved by FAISS top-20 **0.58%**, cut by the shortlist 0.03%, another S1 won (stage 1/2) **0.84%**
+    (0.56% + 0.28%), correct S1 but q < 0.5 0.38%, correct S1 with 0.5 ≤ q < 0.70 0.17%. 97.5% of missed pairs are in
+    S1s that have other accepted records. **In the examples almost every missed record has an EMPTY address (name
+    only)**, e.g. S1 `cure pub @ 1094 ohio river road` vs record `cure pub` with no address → not retrieved.
+21. **DO NOT APPLY — second-model veto on US / India (E25, `exp17.py`):** requiring the main stack to agree
+    (France-style min) is flat to negative: cross-fitted −0.000013; min(bge, main) ≥ 0.70 −0.000053.
+22. **RUNNING — E26 name-only records (`exp18.py`):** recall of empty-address records, and a rule matching an
+    empty-address record to the only S1 with the same core name / skeleton, scored on validation.
 
 
 ## Ready-made files on padum (read access granted to aib262144 via setfacl, incl. files written later)
