@@ -4,6 +4,12 @@ Match every Source 2 / Source 3 record to the Source 1 (reference) entity it bel
 This folder holds only the code that builds our submitted file (**leaderboard 0.99084**) and `reproduce.sh`, which
 runs it end to end from the provided data.
 
+> **Branch `C6-decword` (candidate on top of C4):** `x_recall.py` adds `reject_decword`: records of the countries without
+> labels that add a decoy-like word of the census (the same-building type-word swap) are rejected at any position, not
+> only at the S1's house number. On C4's files it removes 157 France matches ("Internes Club SARL" ← "Internes Union
+> SARL", "Christ Pharmacie" ← "Christ Amicale"); US / India unchanged; matching md5 `f70f4cbf`, candidate_pairs
+> `1a8b4f5c`, validator PASS. Expected +0.00002 to +0.00004 (break-even: 30% of the removed are decoys).
+
 ## Pipeline
 
 Every S2/S3 record belongs to at most one S1 entity (training ground truth: 7.6M matched ids, none reused), so each

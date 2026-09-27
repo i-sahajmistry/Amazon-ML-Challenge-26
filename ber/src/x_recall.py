@@ -31,7 +31,12 @@ reject.
   python x_recall.py COMB LLM RESTORE REJECT [MAIN]   e.g. _fin _v10p restore_dd reject_dd _v10plw
       COMB: x/test_q{COMB} (x_final.py SAVE_Q); LLM: x/llm_test{LLM}; RESTORE / REJECT: x_ddfix.py's lists; MAIN: the
       main stack before the vetoes (samename, vetona, exact); P5 (env, default _v10): candidate pairs x/p5_test{P5}
-      -> x/restore_{empty,nafr,nacore,samename,vetona,exact}.parquet for x_final.py RESTORE=...
+      -> x/restore_{empty,nafr,nacore,samename,vetona,exact}.parquet for x_final.py RESTORE=...,
+         x/reject_decword.parquet for x_final.py REJECT=...
+  reject_decword    (a reject list) a record of a country without labels that adds a decoy-like word of that country
+                    (x_ddfix's census: TV >= 0.20, the same-building type-word swap) at any position: the same-address
+                    fixes reject these only at the S1's house number; the recall lists above and the base stack still
+                    accept ~160 elsewhere (no house number, another number, "Internes Club" <- "Internes Union").
 Records the judge has not scored (stage-2 q outside its band) go to x/sn_rows.parquet: `ROWS=sn_rows python x_llm.py
 rows` scores them, then rerun this script.
   python x_recall.py val [VQ]                  the empty-S1 rule on US / India validation (x/llm_val{VQ}), with labels"""
@@ -86,6 +91,7 @@ def lists(comb, llm, restore, reject, main=None):
     sel = unl & ~acc & noaddr & ~twin & same & (m > 0) & ~key.isin(rj)
     d[sel][["rid", "sid"]].to_parquet(f"{XD}/restore_nafr.parquet")
     print("restore_nafr", int(sel.sum()), d[sel].c.value_counts().to_dict(), flush=True)
+    decword(d, unl, t1, t2)
     free = unl & ~acc & ~key.isin(rj)
     # accepted by the main stack before the vetoes (MAIN): the kinds below are restored only where the model trained on
     # labels said yes and only a self-trained veto said no (on US / India the model's own rejections of them are 75-99%
@@ -166,6 +172,22 @@ def lists(comb, llm, restore, reject, main=None):
         sel[i] = set(R) <= set(S) or ini or web
     d[sel][["rid", "sid"]].to_parquet(f"{XD}/restore_exact.parquet")
     print("restore_exact", int(sel.sum()), d[sel].c.value_counts().to_dict(), flush=True)
+
+
+def decword(d, unl, t1, t2):
+    """reject_decword: records of the countries without labels that add a decoy-like word (x_ddfix's census)"""
+    from x_anatomy import positions
+    from x_ddfix import census, words
+    sel = np.zeros(len(d), bool)
+    for c in sorted(set(d.c.values[unl])):
+        i = np.flatnonzero(d.c.values == c)
+        x = census(positions(d.iloc[i], t1, t2))
+        w = words(x, 300)
+        dec = set(w[w.tv >= 0.20].index)
+        sel[i[np.array([bool(set(a.split()) & dec) for a in x["add"].values])]] = True
+    d[sel][["rid", "sid"]].to_parquet(f"{XD}/reject_decword.parquet")
+    print("reject_decword", int(sel.sum()), d[sel].c.value_counts().to_dict(), f"(accepted now: {int((sel & (d.q.values >= T)).sum())})",
+          flush=True)
 
 
 def val(vq):
