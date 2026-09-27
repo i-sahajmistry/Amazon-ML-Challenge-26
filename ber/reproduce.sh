@@ -129,5 +129,6 @@ s wstat_test A -- wstat.py test
 s rule_fr A -- rule_fr.py _v10plw
 s x_ddfix A -- x_ddfix.py _v10plw _v10fr3l
 s v10_fr3_llm_dd A FROM=$VETO RESTORE=restore_dd REJECT=reject_dd -- x_final.py "$AMLC_ROOT/output_v10_fr3_llm_dd" _v10plw 0.70
+O=$AMLC_ROOT/output_v10_fr3_llm_dd   # absolute: "../" would leave AMLC_ROOT when student_resource is a symlink
 cd "$AMLC_ROOT/student_resource" && "$PY" utils/validate_submission.py --check-ids --test-dir dataset/test \
-    --matching ../output_v10_fr3_llm_dd/matching_results.tsv --candidate ../output_v10_fr3_llm_dd/candidate_pairs.tsv
+    --matching "$O/matching_results.tsv" --candidate "$O/candidate_pairs.tsv"
