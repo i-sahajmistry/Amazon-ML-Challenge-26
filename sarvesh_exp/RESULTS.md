@@ -32,7 +32,14 @@ calibrated. France is much stricter on number-mismatched records: *same name, re
 accepted 35% in France vs 85% US / 89% India (validation: 73% / 81% true, accepted 89% / 93% at 99.95% precision);
 *different name, lower number* 4% vs 51% / 41%; *same name, number up > 13* 21% vs 50% / 87%. Caveat: France has fewer
 such rows per S1 (0.18 vs 0.41), so part of this may be real. Decoys shift UP 1–13 and come in groups at one
-number; E41 tests "same name + lower number + alone at that number" and builds upload-ready files.
+number. **RESULT (E41 / E42): France is RIGHT to reject them — AVOID.** On US / India validation the REJECTED records of
+these buckets are 0.2–2% true (down same-name alone 0.65%, with peers 2.4%; up > 13 same-name 0.2%); the France ones
+are namesake businesses on other streets (`Bordeaux Amicale EURL` 46 Rue de Solférino vs 6 R. Sullivan). Files built
+for the test are renamed `DO_NOT_UPLOAD_E16fr3_F1/F2` (+7,244 / +15,469 France pairs).
+
+**E42 — the France veto chain on labelled data (`exp31.py`):** min(main, a1, a2, a3) on US / India validation scores
+**0.99262 → 0.99248 (−0.00014)**: it removes ~1,600 true matches for ~400 false. The vetoes helped France on the LB
+(v9p → v10_fr3), so they correct something France-specific; they are not label-validated (see DOC_REVIEW flag 5).
 
 ## FOR THE FINAL BUILD — read this first (kept current)
 Written for whoever builds the final file (team or their assistant). Baseline = `variant_v10seed_dd`, LB 0.990349,
