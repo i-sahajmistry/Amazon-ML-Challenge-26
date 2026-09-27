@@ -1,6 +1,7 @@
 # Experiments on top of the best file (Sarvesh, 27 Sep)
 
 ## TL;DR for the final build (latest first) — TRY / AVOID, with why
+**Doc review:** `sarvesh_exp/DOC_REVIEW.md` — 10 flags on `ber/Documentation_template.md` / `pipeline.png` (1 render bug, 4 medium).
 **Leaderboard:** the team's final file **E16fr3 = 0.990807** (6th; md5 `e93605ad`, final-dd d7db51d) = E16 (bge stack +
 empty-S1 rescue) + Mohanish's x_recall.py (rescue at q ≥ 0.40 in every country incl. France with an LLM gate; France
 no-address exact-unique-name restores).
