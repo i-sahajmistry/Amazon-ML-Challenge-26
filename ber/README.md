@@ -1,5 +1,8 @@
 # Business Entity Resolution
 
+> **Final file: C11, leaderboard 0.990934.** C8 (0.99091) without `restore_vetona` and `restore_samename`: the final step of `reproduce.sh` restores `restore_dd, restore_empty, restore_nafr, restore_nacore, restore_exact, restore_alias` only. The two dropped lists undo France self-training vetoes; the leaderboard showed such undos are mostly wrong in France (C10, which filled empty S1s the same way, scored 0.990851). The lists are still built by `x_recall.py` but no longer used. matching_results md5 f4bf6c39, candidate_pairs 1a8b4f5c.
+
+
 Match every Source 2 / Source 3 record to the Source 1 (reference) entity it belongs to, scored by macro F0.5.
 This folder holds only the code that builds our submitted file (**leaderboard 0.99091**) and `reproduce.sh`, which
 runs it end to end from the provided data.

@@ -100,7 +100,7 @@ s fin_q A FROM=$F SAVE_Q=_fin -- x_final.py - _v10bplw
 s x_recall A -- x_recall.py _fin _v10p restore_dd reject_dd _v10plw
 s llm_sn C ROWS=sn_rows -- x_llm.py rows          # the judge on recall candidates outside its band (x/sn_rows)
 s x_recall2 A -- x_recall.py _fin _v10p restore_dd reject_dd _v10plw                    # + their scores
-s final A FROM=$F RESTORE=restore_dd,restore_empty,restore_nafr,restore_nacore,restore_samename,restore_vetona,restore_exact,restore_alias REJECT=reject_dd,reject_decword -- x_final.py "$AMLC_ROOT/output" _v10bplw 0.70
+s final A FROM=$F RESTORE=restore_dd,restore_empty,restore_nafr,restore_nacore,restore_exact,restore_alias REJECT=reject_dd,reject_decword -- x_final.py "$AMLC_ROOT/output" _v10bplw 0.70
 O=$AMLC_ROOT/output   # absolute: "../" would leave AMLC_ROOT when student_resource is a symlink
 cd "$AMLC_ROOT/student_resource" && "$PY" utils/validate_submission.py --check-ids --test-dir dataset/test \
     --matching "$O/matching_results.tsv" --candidate "$O/candidate_pairs.tsv"
