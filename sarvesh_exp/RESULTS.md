@@ -67,7 +67,7 @@ md5 e73c409e. Each item: what, evidence, how to apply, decision rule. Details an
 14. **Stage-2 tuning (E18, `s2tune.pbs`)** on the E10 control's stage 1 (control + LLM 0.70 = 0.99289):
     - **DO NOT APPLY — `big`** (127 leaves, min_data_in_leaf 200, BAG 5): stage 2 0.70 0.99276 vs 0.99274, + LLM
       0.70 **0.99289 = control 0.99289**; logloss worse (0.00817–0.00819 vs 0.00812–0.00815). No gain.
-    - RUNNING — `lr` (learning rate 0.05 → 0.025, BAG 10): early logloss better (0.00810 vs 0.00813).
+    - DO NOT APPLY — `lr` (learning rate 0.025, BAG 10): stage 2 0.99276 vs 0.99274 (item 19).
 15. **LEADERBOARD BET — E19 = E17 + E2** (`exp11.pbs`, `amlc_exp/out_E19/`): US / India as E17, France as E2 (bge +
     LLM stack as a 4th France min-veto). Checked: US / India pair-for-pair identical to E17, France identical to E2
     (855,682, −3,656 vs the variant). matching md5 **`c91f83b1`**, candidate_pairs `15fb51cc` (12.02M), validator
@@ -91,6 +91,15 @@ md5 e73c409e. Each item: what, evidence, how to apply, decision rule. Details an
     - France chain (accepted records): base 863,509 → after the 3 min-vetoes 837,823 (−25.7k) → + restore 870,443 →
       − reject **859,338**. 31,331 records with base q ≥ 0.70 are vetoed, 12,586 of them with base q ≥ 0.99, mostly in
       S1s that keep 2–5+ matches. Whether those vetoes are right can only be judged on the leaderboard.
+18. **E23 — Occam decoy check (`exp15.py`): test accepted pairs look exactly like train true matches; no hidden decoy
+    leak.** Share of pairs whose first house numbers disagree: train true matches US 11.70% / India 7.25%; **test
+    accepted US 12.09% / India 7.35%** (+0.4 / +0.1 pt); train distractors 95% / 57%. Same for same-name,
+    same-address, same-name + number-conflict (US 6.63% vs 6.35%). On validation the number conflict does not separate
+    wrong accepted pairs (9.3%) from right ones (10.0%). So a number-conflict rule cannot help US / India.
+    France: accepted 3.98% conflict; the 31,331 vetoed records **24.7%** (same name + conflict 15.4% vs 2.9%): the
+    vetoes mostly remove decoy-looking pairs, consistent with them helping on the leaderboard (supports E2 / E19).
+19. **DO NOT APPLY — stage-2 `lr` (0.025, BAG 10):** stage 2 0.70 0.99276 vs control 0.99274 (noise); stopped before
+    the LLM blend.
 
 
 ## Ready-made files on padum (read access granted to aib262144 via setfacl, incl. files written later)
