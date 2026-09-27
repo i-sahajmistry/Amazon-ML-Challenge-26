@@ -10,6 +10,26 @@ TRY:
 1. **E17-style smaller candidate set** (our `out_E17`, md5 `eb6fdbec`): same validation as E16 (−0.00002, noise), 5.8%
    fewer pairs (12.02M). Only if a smaller candidate file helps the ranking; the team judged E17fr2 ≈ E16fr3 on score.
 
+**NEW BEST BET — E49: let the LLM judge overrule France's vetoes (`exp36.py`)**
+France's decision = min(main + judge, a1, a2, a3): an AND-veto. It removes **25,686** France records that the main
+stack + judge accepted (not counting `reject_fr_dd`); **21,158** of them already have an LLM margin (they are in the
+judge's unsure band), so no new LLM run is needed.
+Evidence on labelled US / India validation (same chain built from `val_q_a1/a2/a3pw`): the chain vetoes 2,259 records
+the main + judge accepted, **83.7% of them true**; F0.5 main 0.99282 → chain 0.99253. Restoring vetoed records whose
+LLM margin ≥ m, cross-fitted (fold 8 ↔ 9), **+0.00029** vs the chain (same at the test-like 40% distractor share):
+
+| restore if LLM margin ≥ | val rows | true | gain vs chain | France records restored |
+|---|---|---|---|---|
+| 1 | 1,980 | 0.847 | +0.00029 | (≥0: 15,856) |
+| 2 | 879 | 0.931 | +0.00023 | 8,501 |
+| 4 | 595 | 0.951 | +0.00019 | 4,001 |
+| 6 | 243 | 0.975 | +0.00010 | 1,218 |
+
+Caveat: on the LB the vetoes helped France (v9p → v10_fr3), so France's vetoed set is more decoy-rich than US / India's;
+the LLM margin is what separates them, hence a high cut. Files (E16fr3 + restores of records E16fr3 leaves unplaced;
+US / India untouched): `out_E16fr3_llmveto6` (safest), **`out_E16fr3_llmveto4` (recommended)**, `out_E16fr3_llmveto2`
+(boldest); md5s below once built. If France behaves like US / India, llmveto4 ≈ +0.0002–0.0004 overall.
+
 **LEADERBOARD PROBES ON E16fr3 (ready to upload; US / India byte-identical to E16fr3, only France changes; all PASS
 `--check-ids`, candidate_pairs = E16fr3's `1a8b4f5c`; padum `/scratch/scai/mtech/aib262045/amlc_exp/out_<name>/`, each
 with `changes.tsv` listing every changed pair):**
