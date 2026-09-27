@@ -1,4 +1,4 @@
-# E16fr3-sn: E16fr3 + same-name records at another address (France recall)
+# E16fr3-sn: E16fr3 + two France recall lists (same name at another address; no address, same core name)
 
 Branch `E16fr3-sn`, built on `final-dd` fefa59e (E16fr3, leaderboard 0.990807). One new restore list,
 `restore_samename`, in `x_recall.py`. It applies only to the countries without training labels (France here).
@@ -54,3 +54,23 @@ Candidates outside the judge's band (stage-2 q ≤ 0.01) have no judge score. `x
 - `src/x_recall.py`: `restore_samename` (plus `x/sn_rows.parquet` for the judge).
 - `src/x_llm.py`: new `rows` mode (`ROWS=<file> [SHARD=i/n] python x_llm.py rows`).
 - `reproduce.sh`: `llm_sn` (lane C) and `x_recall2` before `final`; `final` adds `restore_samename`.
+
+## Second list: restore_nacore (no address, same core name)
+
+A rejected record with no address is restored to its best S1 when:
+- its core name (legal form dropped) equals the S1's, but the full name differs ("Helena Club SAS" for "Helena Club");
+- no other S1 of the country has that core name;
+- the LLM judge accepts it.
+
+Evidence:
+- **US / India validation:** such records are 98.0% (US) / 98.4% (India) true, and the models accept 97.5–98.5%. When
+  another S1 shares the core name, only 44–48% are true (half belong to the other S1), so those are left out.
+- **France (E16fr3):** accepts 72.5% of the records without a namesake. If France's records of this kind are as right
+  as US / India's (98%), at least ~93% of the rejected ones are true. The judge says yes to 95% of them.
+- A sample of 40 reads as the same business with the address dropped and the legal form changed.
+
+Result: 1,078 restores (candidates 1,125). Combined with `restore_samename`: France 867,859 (+5,707 over E16fr3),
+matching md5 `fdea1f55`, validator PASS, candidate_pairs unchanged (`1a8b4f5c`). Expected leaderboard change of this
+list: about +0.00004.
+On Sahaj's v10-only rerun (`amlc_v10only`, sandbox `~/scratch/v10chk`): `restore_nacore` 1,059 (original files 1,078),
+`restore_samename` 3,412; France 865,410; matching md5 `8a6f769d`; validator PASS.

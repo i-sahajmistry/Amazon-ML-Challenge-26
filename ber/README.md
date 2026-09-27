@@ -4,9 +4,11 @@ Match every Source 2 / Source 3 record to the Source 1 (reference) entity it bel
 This folder holds only the code that builds our submitted file (**leaderboard 0.990807**) and `reproduce.sh`, which
 runs it end to end from the provided data.
 
-> **Branch `E16fr3-sn` (candidate, not the shipped file):** E16fr3 + `restore_samename` in `x_recall.py`: France
-> records with their S1's exact name at another address, alone at that number, outside the decoy shift, that the LLM
-> judge accepts (4,646 restores; matching md5 `519bc93e`). Evidence and checks: [description.md](description.md).
+> **Branch `E16fr3-sn` (candidate, not the shipped file):** E16fr3 + two France recall lists in `x_recall.py`:
+> `restore_samename` (records with their S1's exact name at another address, alone at that number, outside the decoy
+> shift, accepted by the LLM judge; 4,646) and `restore_nacore` (no-address records with the S1's core name and no other
+> S1 with that core name, judge yes; 1,078). Matching md5 `fdea1f55` (idea 1 alone: `519bc93e`). Evidence and checks:
+> [description.md](description.md).
 
 ## Pipeline
 

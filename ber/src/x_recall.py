@@ -16,12 +16,17 @@
                     never another namesake's record), and the models accept 47-97%; France accepts 5-62%. France's
                     rejected ones get the judge's yes 69-81% of the time, US / India's rejected ones (1-6% true)
                     17-44%: by the judge's validation calibration ~70-85% of them are true, ~92% of those it accepts.
-                    Records the judge has not scored (stage-2 q outside its band) go to x/sn_rows.parquet:
-                    `ROWS=sn_rows python x_llm.py rows` scores them, then rerun this script.
+  restore_nacore    countries without training labels: a rejected record with no address whose core name (legal form
+                    dropped) equals its S1's while the full name differs ("X SAS" for "X SARL"), no other S1 of the
+                    country has that core name, and the judge accepts it. Without the namesake condition these were
+                    ~60% true by hand review, mostly an "X SARL" record whose own S1 "X SAS" sits elsewhere.
+Records the judge has not scored (stage-2 q outside its band) go to x/sn_rows.parquet: `ROWS=sn_rows python x_llm.py
+rows` scores them, then rerun this script.
 All lists leave out the pairs the same-address fixes reject.
   python x_recall.py COMB LLM RESTORE REJECT   e.g. _fin _v10p restore_dd reject_dd
       COMB: x/test_q{COMB} (x_final.py SAVE_Q); LLM: x/llm_test{LLM}; RESTORE / REJECT: x_ddfix.py's lists
-      -> x/restore_empty.parquet, x/restore_nafr.parquet, x/restore_samename.parquet for x_final.py RESTORE=...
+      -> x/restore_empty.parquet, x/restore_nafr.parquet, x/restore_samename.parquet, x/restore_nacore.parquet
+         for x_final.py RESTORE=...
   python x_recall.py val [VQ]                  the empty-S1 rule on US / India validation (x/llm_val{VQ}), with labels"""
 import glob, sys, numpy as np, pandas as pd
 from common import WORK, load, unlabelled
@@ -69,17 +74,28 @@ def lists(comb, llm, restore, reject):
     sn = np.zeros(len(d), bool)
     sn[ss[(a >= 0) & (n >= 0) & (sh != 0) & (at == 1) & ~((sh >= SHIFT[0]) & (sh <= SHIFT[1]))]] = True
     sn &= cand
+    # restore_nacore: no address, the same core name as its S1 (full name differs), no other S1 with that core name
+    cnc = pd.DataFrame({"c": ct1, "cn": t1.cn.values}).value_counts()
+    ctwin = cnc.reindex(pd.MultiIndex.from_arrays([d.c.values, t2.cn.values[d.rid.values]])).fillna(0).values >= 2
+    core = t2.cn.values[d.rid.values] == t1.cn.values[d.sid.values]
+    nc = unl & ~acc & noaddr & ~same & core & ~ctwin & ~key.isin(rj)
     ms = m.copy()
     for f in sorted(glob.glob(f"{XD}/llm_sn_rows*.parquet")):
         e = pd.read_parquet(f)
         e2 = pd.Series(e.llm.values, index=pd.MultiIndex.from_frame(e[["rid", "sid"]])).reindex(key).values
         ms = np.where(np.isfinite(ms), ms, e2)
-    need = sn & ~np.isfinite(ms)
+    need = (sn | nc) & ~np.isfinite(ms)
     d[need][["rid", "sid"]].reset_index(drop=True).to_parquet(f"{XD}/sn_rows.parquet")
     sel = sn & (ms > 0)
     d[sel][["rid", "sid"]].to_parquet(f"{XD}/restore_samename.parquet")
     print(f"restore_samename {int(sel.sum())} {d[sel].c.value_counts().to_dict()} (candidates {int(sn.sum())}, judge "
-          f"yes {int(sel.sum())} / no {int((sn & (ms <= 0)).sum())}, not scored {int(need.sum())} -> x/sn_rows.parquet)",
+          f"yes {int(sel.sum())} / no {int((sn & (ms <= 0)).sum())}, not scored {int((sn & ~np.isfinite(ms)).sum())}; "
+          f"{int(need.sum())} rows to score -> x/sn_rows.parquet)",
+          flush=True)
+    sel = nc & (ms > 0)
+    d[sel][["rid", "sid"]].to_parquet(f"{XD}/restore_nacore.parquet")
+    print(f"restore_nacore {int(sel.sum())} {d[sel].c.value_counts().to_dict()} (candidates {int(nc.sum())}, judge "
+          f"yes {int(sel.sum())} / no {int((nc & (ms <= 0)).sum())}, not scored {int((nc & ~np.isfinite(ms)).sum())})",
           flush=True)
 
 
