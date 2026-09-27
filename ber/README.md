@@ -1,7 +1,7 @@
 # Business Entity Resolution
 
 Match every Source 2 / Source 3 record to the Source 1 (reference) entity it belongs to, scored by macro F0.5.
-This folder holds only the code that builds our submitted file (**leaderboard 0.99084**) and `reproduce.sh`, which
+This folder holds only the code that builds our submitted file (**leaderboard 0.99091**) and `reproduce.sh`, which
 runs it end to end from the provided data.
 
 ## Pipeline
@@ -70,6 +70,14 @@ country or a language.
      US / India); at the S1's exact address, the only S1 there, a name that adds no word (initials, a website, dropped
      words). Also no-address records with the S1's core name (legal form differs) that no other S1 has, judge yes.
      France: 1,182 + 563 + 161 + 1,078 restores (+2,916 matches), leaderboard +0.00003.
+   - *Aliases and initials at the S1's exact address, countries without labels* (the only S1 there): a made-up name
+     sharing nothing with the S1's name (a word of 4+ letters in no S1 name of any country: the generator's
+     unrelated-DBA noise) when the main stack's q ≥ 0.80, or q ≥ 0.10 with at most 2 made-up names at the S1 (US /
+     India validation 97–99.8% / ~90% true; below 0.10 they are 0% true); and the S1's initials there even where the
+     main stack rejected them (US / India: 100% true). France: 336 aliases, 56 more initials.
+   - *Decoy words anywhere, countries without labels* (`reject_decword`): a record adding a decoy-like word of the
+     census (step 8: the same-building type-word swap, ~22% true on US / India) is rejected at any position, not only
+     at the S1's house number (157 France matches). With these two, the leaderboard rose from 0.99084 to 0.99091.
 10. **Decision** (`x_final.py`): accept a record when its score is ≥ 0.70, the same threshold for every country.
 
 Folds: `crc32(S1 id) % 10`; 0–3 train the bi-encoder and the cross-encoders, 4–9 stages 1 and 2; stage 2 is validated
@@ -80,7 +88,8 @@ on entity folds 8–9 after fitting on 4–7 (US / India validation F0.5 0.99294
 
 | File | Score |
 |---|---|
-| **C4** (submitted; this pipeline) | **0.99084** |
+| **C8** (submitted; this pipeline) | **0.99091** |
+| C4 (without the alias, initials and decoy-word lists of step 9) | 0.99084 |
 | E16fr3 (without the vetoed-record and core-name lists of step 9) | 0.990807 |
 | variant_v10seed_dd (without the bge stack and the recall fixes) | 0.990349 |
 | v10_fr3_llm_dd (France rounds seeded from two older stacks, since removed) | 0.990282 |
