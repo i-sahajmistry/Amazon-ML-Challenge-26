@@ -1,4 +1,4 @@
-"""v5 = v4 (cross-fitted stage 1 + entity-context stage 2) with cross-encoder features (x_ce.py).
+"""v5 = v4 (cross-fitted stage 1 + entity-context stage 2) with cross-encoder features (x_ce3.py).
 The CE saw S1 folds 0-3, so every train / validation set here drops records with fold 0-3 (owned records follow
 their owner's fold, distractors their hash fold).
   python x_stage.py s1     # stage 1, cross-fitted: folds 4-6 -> A, 7-9 -> B  => x/oof5_train, x/p5_test

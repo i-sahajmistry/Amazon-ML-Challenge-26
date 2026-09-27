@@ -14,7 +14,7 @@ KF = int(os.environ.get("KF", 5))  # candidates per S2/S3 record that go to the 
 # Adaptive shortlist of the retrieved top-20 (empty = fixed top-KF); what it keeps is candidate_pairs.tsv:
 #   SHORTLIST="softmax:T:c"  per record, the fewest top candidates whose softmax(score / T) sums to >= c  (Sarvesh)
 #   SHORTLIST="gap:d"        per record, every candidate scoring within d of the record's best             (Sarvesh)
-#   SHORTLIST="model:tau"    candidates whose calibrated probability (shortlist.py, retrieval features only) >= tau
+#   SHORTLIST="model:tau"    candidates whose calibrated probability (a model on retrieval features only) >= tau
 #   SHORTLIST="text:tau"     the same, from the model that also sees name / address similarities (x_shortlist2.py)
 SHORTLIST = os.environ.get("SHORTLIST", "")
 SHORT_F = ["score", "rank", "gap_top1", "gap_next", "top1", "n02", "n05", "n10", "soft"]
