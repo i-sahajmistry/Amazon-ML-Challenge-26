@@ -1,19 +1,20 @@
 # Experiments on top of the best file (Sarvesh, 27 Sep)
 
 ## TL;DR for the final build (latest first) — TRY / AVOID, with why
-**Leaderboard:** the team's 0.990807 submission (6th) included E16 (E1 + US/India empty-S1 rescue) plus the team's own
-changes; E16 alone was +0.0002 on US / India validation.
+**Leaderboard:** the team's final file **E16fr3 = 0.990807** (6th; md5 `e93605ad`, final-dd d7db51d) = E16 (bge stack +
+empty-S1 rescue) + Mohanish's x_recall.py (rescue at q ≥ 0.40 in every country incl. France with an LLM gate; France
+no-address exact-unique-name restores).
 
-TRY (in this order):
-1. **E17** (`out_E17`, md5 `eb6fdbec`): E16 on a 5.8% smaller candidate set (12.02M pairs). Why: same validation as E16,
-   smaller candidate file ranks higher.
-2. **E30 — France rescue** (`out_E30`, md5 `88ed83ae`, PASS; `exp22.py`): E17 + the empty-S1 rescue applied to France
-   too (an empty France S1 takes its best claimant if q ≥ 0.5): **312 France S1s filled**, nothing else changes.
-   Why: the rescue is validated on US / India (+0.00009) and was part of E16, which moved the LB; France never had it.
-   LB-only. Bolder: **E30b** t = 0.4 (439 S1s, md5 `f4ef0c2a`).
-3. **E19 / E31**: + bge stack as a 4th France veto (E31 = E19 + France rescue, 266 S1s, md5 `d9211e73`, PASS). Why: E23 shows the vetoed France pairs are decoy-like (house-number
-   conflict 25% vs 4% in kept pairs), and vetoes have helped France on the LB before. LB-only.
+TRY:
+1. **E17-style smaller candidate set** (our `out_E17`, md5 `eb6fdbec`): same validation as E16 (−0.00002, noise), 5.8%
+   fewer pairs (12.02M). Only if a smaller candidate file helps the ranking; the team judged E17fr2 ≈ E16fr3 on score.
 
+SUPERSEDED: **E30 / E30b (France rescue)** — E16fr3's `restore_empty` already fills 344 empty France S1s (q ≥ 0.40,
+LLM gate), which is the better-guarded version of the same idea.
+
+AVOID — **E19 / E31 (bge stack as a 4th France veto)**: the team's hand review found E19 wrong on all 4 reviewed changes;
+the ~3,650 France records it removes sit at the S1's own address and mostly add *& Fils / Groupe / Développement*,
+which the census marks as true-match suffixes. (Our E23 looked at the 3 existing vetoes, not this one.)
 AVOID (validated on US / India, all ≤ 0 or noise): stack averaging (E7), per-country / per-crowding thresholds (E8,
 E12), lone-match drop (E13b), sibling rule (E15), stage-2 tuning bigger trees / lower lr (E18), expected-F0.5 per S1
 (E20, worse than the simple rescue), second-model veto on US / India (E25), exact / fuzzy name rules for name-only
