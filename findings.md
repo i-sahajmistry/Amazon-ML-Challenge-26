@@ -23,6 +23,8 @@ validation (entity folds 8-9, distractors weighted to the test share of 39%, cop
   shortlist (6.27 per S1) loses France matches (entry 10:10, `tight_dd`), so it is not used.
 - **Open:** (1) is `variant_v10seed_dd` the final file? (2) If so, `final-dd` should build it: the variant's steps in
   `reproduce.sh` instead of the v9s / v9s2 / v10s3 rounds, checked on the rerun's v10 files (~4-5 h on one GPU).
+- **Before the final submission:** checklist in [SUBMISSION_NOTES.md](SUBMISSION_NOTES.md) (what goes in the zip, what
+  must stay out: architecture.md and review/ are on v11 for the team only).
 
 ## 2026-09-27 10:35 — `variant_v10seed_dd` leaderboard 0.990349 (dd 0.990282, +0.000067): new best
 - The spare probe (entry 09:50). Two changes against dd: the three France rounds seeded from v10 / v10+a1 /
