@@ -1,7 +1,7 @@
 # Business Entity Resolution
 
 Match every Source 2 / Source 3 record to the Source 1 (reference) entity it belongs to, scored by macro F0.5.
-This folder holds only the code that builds our submitted file (**leaderboard 0.990807**) and `reproduce.sh`, which
+This folder holds only the code that builds our submitted file (**leaderboard 0.99084**) and `reproduce.sh`, which
 runs it end to end from the provided data.
 
 ## Pipeline
@@ -62,6 +62,14 @@ country or a language.
    - *No-address records, countries without labels:* a rejected record with no address whose normalised name equals
      its S1's and no other S1's of the country, and that the judge accepts, is restored. US / India models accept
      93–97% of such records, France's 84%: its self-training vetoes learned "no address = reject".
+   - *Vetoed records of kinds that are almost always true, countries without labels:* records the main stack accepts
+     and a self-trained stack vetoes, of kinds the US / India models accept and get right 95–100% of the time: an
+     address without a house number on the S1's street, or with a name no other S1 has (judge margin ≥ 2); the S1's
+     exact name at another number of its street (judge yes), unless another candidate S1 sits 1–13 numbers below it on
+     that street (then it is that S1's decoy with a type word swapped that spells a namesake's name: 0% true on
+     US / India); at the S1's exact address, the only S1 there, a name that adds no word (initials, a website, dropped
+     words). Also no-address records with the S1's core name (legal form differs) that no other S1 has, judge yes.
+     France: 1,182 + 563 + 161 + 1,078 restores (+2,916 matches), leaderboard +0.00003.
 10. **Decision** (`x_final.py`): accept a record when its score is ≥ 0.70, the same threshold for every country.
 
 Folds: `crc32(S1 id) % 10`; 0–3 train the bi-encoder and the cross-encoders, 4–9 stages 1 and 2; stage 2 is validated
@@ -72,7 +80,8 @@ on entity folds 8–9 after fitting on 4–7 (US / India validation F0.5 0.99294
 
 | File | Score |
 |---|---|
-| **E16fr3** (submitted; this pipeline) | **0.990807** |
+| **C4** (submitted; this pipeline) | **0.99084** |
+| E16fr3 (without the vetoed-record and core-name lists of step 9) | 0.990807 |
 | variant_v10seed_dd (without the bge stack and the recall fixes) | 0.990349 |
 | v10_fr3_llm_dd (France rounds seeded from two older stacks, since removed) | 0.990282 |
 | v10_fr3_llm (without the same-address fixes) | 0.987071 |

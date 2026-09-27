@@ -15,8 +15,10 @@ entity. Blocking uses a fine-tuned multilingual bi-encoder, HNSW search and a ca
 LightGBM stages over 62 pair features and two cross-encoders (three, with a bge reranker, for the countries with
 training labels), and a LoRA-tuned 4B reranker judges the unsure records. France has no training labels, so it gets
 three self-training rounds, used only as vetoes, and label-free fixes derived from how the data places decoys at house
-numbers. Last, recall fixes fill S1s left empty and restore no-address records that carry the S1's exact, unique name.
-Macro F0.5 is **0.9930 on US / India validation** and **0.990807 on the public leaderboard**.
+numbers. Last, recall fixes fill S1s left empty and, for France, restore records the self-training vetoes rejected where the
+labelled countries show that kind of record is almost always a true match (no address or no house number with the S1's
+unique name or street, the exact name further along the S1's street, initials at its address). Macro F0.5 is **0.9930
+on US / India validation** and **0.99084 on the public leaderboard**.
 
 ---
 
@@ -171,6 +173,7 @@ about. We kept P ≥ 0.001.
 | Vetoes | a record of such a country is accepted only if the main stack and the 3 self-trained stacks all pick the same S1, at the lowest of the 4 scores | |
 | Same-address fixes (countries without labels) | label-free census: each S1 gets a roughly fixed number of decoys, normally at one shifted number, so a decoy placed at the S1's *own* address leaves that shifted cluster short. For every word records add at the S1's address, we compare how many of the S1's records sit at other numbers, between those records and unedited ones (total variation distance TV). **True-like** (TV ≤ 0.10): a structurally matching record (same number and sub-number, the S1's distinctive street words, first and rarest core-name word) adding only such words is restored. **Decoy-like** (TV ≥ 0.20): an accepted same-address record adding one is rejected | the test records' own structure. On US / India validation, TV ≤ 0.10 words are 98.7% / 90.8% true and TV ≥ 0.20 words 22.5% true (India) |
 | Recall fixes | **Empty S1s:** an S1 with no accepted record takes its best candidate if q ≥ 0.40 (every country; for the countries without labels only if the LLM judge does not say no, since the candidates it rejects there are mostly a type word swapped at the S1's own address). **No-address records (countries without labels):** a rejected record with no address whose normalised name equals its S1's and no other S1's of the country, and that the judge accepts, is restored | US / India validation: the empty-S1 rule +0.00007 at 0.40; every threshold from 0.4 to 0.65 gains when cross-fitted over the two validation folds. No-address records with the S1's exact, unique name: US / India models accept 93–97%, France's 84% (its self-training vetoes learned "no address = reject") |
+| Recall fixes: vetoed records | **Countries without labels:** a record the main stack accepts and a self-trained stack vetoes is restored when it is one of these kinds: an address without a house number on the S1's street or with a name no other S1 has (judge margin ≥ 2); the S1's exact name at another number of its street (judge yes), unless another candidate S1 sits 1–13 numbers below it there; at the S1's exact address, the only S1 there, a name that adds no word (initials, a website, dropped words). Also a no-address record with the S1's core name that no other S1 has (judge yes) | On US / India validation these kinds are 89–100% true and the models accept them; a same-name record sitting 1–13 numbers above another candidate S1 is that S1's decoy (0% true), and the model's own rejections of these kinds are 75–99% wrong records, so only vetoes are undone. France: +2,916 matches, leaderboard 0.990807 → 0.99084 |
 
 The same-address fixes and the no-address restores run only where labels are missing. Where labels exist, the models
 already get these records right, and the same-address fixes would cost India 0.0024 (checked with labels).
@@ -188,7 +191,7 @@ singletons) gained +0.00000, and an expected-F0.5 decision per S1 gained +0.0000
 - **F_0.5 Score (macro):**
     - validation (US / India): **0.9930** with the bge stack, the LLM judge and the empty-S1 rule (0.99294 without the
       rule; 0.99282 for the two-cross-encoder stack with the judge; 0.99262 for its stage 2 alone);
-    - public leaderboard: **0.990807**.
+    - public leaderboard: **0.99084**.
     - France has no labels. If US / India score on the leaderboard about as on validation, the leaderboard implies a
       France F0.5 of roughly 0.98.
 
@@ -228,7 +231,9 @@ pairs) or lost to another S1 as the record's best (0.84%) are not in it.
       that carry the S1's exact, unique name (`Fleuri Confrerie-Culturelle E.U.R.L.`, `Team Ecole [(France)]`), and
       left S1s empty whose only true record is an alias or initials at the S1's own address (`Drexarc Labs`, `BF`,
       `EL`). The recall fixes restored 2,508 such records and filled 344 empty France S1s (923 in US / India); with the
-      bge stack for US / India, the leaderboard rose from 0.990349 to **0.990807**.
+      bge stack for US / India, the leaderboard rose from 0.990349 to 0.990807. Restoring vetoed records of the kinds
+      above (no house number on the S1's street, the exact name along its street, initials at its address) and
+      no-address records with a unique core name added 2,916 France matches: **0.99084**.
 
 The largest remaining loss (+0.00208) is information-limited: the missing address cannot be recovered, and per-bucket
 thresholds did not help. For scale, fixing all three error types in the table gives about 0.9957; that is not an
@@ -273,7 +278,7 @@ AMLC_ROOT=/folder/with/student_resource GPU_A=0 GPU_B=1 GPU_C=2 bash reproduce.s
 | Stage 1 (cross-fitted); stage 2 with entity context and peers | `stage1_cv.py`, `x_stage_multi.py`, `stage2.py`, `x_nocopy.py`, `decide.py` |
 | LLM judge and blend | `x_llm.py`, `x_llmstack.py` |
 | Same-address fixes (countries without labels) | `x_anatomy.py`, `wstat.py`, `rule_fr.py`, `x_ddfix.py` |
-| Recall fixes (empty S1s; no-address records) | `x_recall.py` |
+| Recall fixes (empty S1s; no-address records; vetoed records of safe kinds) | `x_recall.py` |
 | Vetoes, fixes, threshold → the two TSV files | `x_final.py` |
 
 - **Hardware and time:** three A100 80GB GPUs (one works; lanes share it), ~64 CPU cores, ~250 GB RAM; about 9–10 h
@@ -307,11 +312,12 @@ AMLC_ROOT=/folder/with/student_resource GPU_A=0 GPU_B=1 GPU_C=2 bash reproduce.s
 | v10_fr3_llm | + LLM judge | 0.99282² | 0.98707 |
 | v10_fr3_llm_dd | + same-address census fixes | = | 0.99028 |
 | variant_v10seed_dd | France rounds seeded from the main stack itself; judge on every unsure record | 0.99282² | 0.99035 |
-| **submitted** | + bge cross-encoder for the countries with labels; recall fixes (empty S1s, no-address records) | **0.9930²** | **0.990807** |
+| E16fr3 | + bge cross-encoder for the countries with labels; recall fixes (empty S1s, no-address records) | 0.9930² | 0.990807 |
+| **submitted** | + France recall fixes for vetoed records of safe kinds, unique core names (Section 4) | **0.9930²** | **0.99084** |
 
 ¹ With duplicated distractors (inflated). ² The harder validation set (each distractor in its S1's fold).
 
-From v9p to the submitted file the leaderboard rose by +0.0081 while US / India validation barely moved, so nearly all
+From v9p to the submitted file the leaderboard rose by +0.0082 while US / India validation barely moved, so nearly all
 of it came from France. France is 15% of the S1s, so a France-only change of Δ on the leaderboard is Δ / 0.15 on France.
 
 **Tried and dropped** (measured):
@@ -325,9 +331,16 @@ of it came from France. France is 15% of the S1s, so a France-only change of Δ 
 - The bge stack as the base, or as a fourth veto, for France: as a veto it removed ~3,650 accepted France records, 89%
   of them at the S1's own address and mostly adding *& Fils*, *Groupe* or *Développement*: the suffix records the
   census shows are true matches.
-- Restoring no-address records that match their S1 only by core name (legal form differing or missing): most of them
-  have a namesake S1 that differs only in the legal form, so a hand review found them ~60% right, below the ~75% an
-  added record needs under F0.5.
+- Restoring no-address records that match their S1 only by core name when another S1 shares that core name: most are
+  the namesake's record (a hand review found them ~60% right, below the ~70% an added record needs under F0.5); only
+  unique core names are restored.
+- Restoring every rejected record with the S1's exact name at another house number: 39% of them sit 1–13 numbers
+  above another candidate S1 on the same street (that S1's type-word decoy spelling a namesake's name; 0% true on
+  US / India), and most of the rest are on other streets among same-city namesakes.
+- Letting the LLM judge overrule every France veto (margin ≥ 2): at the S1's own address it says yes to type-word
+  swaps (*Club → Société*), the same-building decoys the vetoes remove; about half of those restores were wrong by
+  hand review. Exact-address records with one letter of an acronym changed (*BKJV* for *BKJ Federation*) are France's
+  same-building decoy for acronym names, so the exact-address rule allows no added word, not even a typo.
 - A smaller candidate set for the countries with labels (shortlist P ≥ 0.005 there): −5.8% pairs for −0.00002
   validation, i.e. no measurable cost. The organisers rank a smaller candidate set higher, but it needs a per-country
   cut and a second retrain of the labelled countries' stack, and it did not fit in the time left.
