@@ -7,6 +7,8 @@ trained on US / India text cannot.
   python x_llm.py test       # score test rows (x/test_q{QT}w) in the unsure band -> x/llm_test{QT}.parquet
   QB=_v10p python x_llm.py extend   # unsure rows of stage-2 model QB: reuse QT's scores of the same pairs, score the
                                     # rest -> x/llm_{val,test}{QB}{LLM_TAG}.parquet
+  ROWS=sn_rows [SHARD=i/n] python x_llm.py rows   # score the test pairs listed in x/{ROWS}.parquet (every n-th from
+                                    # the i-th with SHARD) -> x/llm_{ROWS}[_iofn].parquet
   SELF=x/test_q_v10fr3l.parquet LLM_INIT=x/llm_lora LLM_DIR=x/llm_lora_fr LLM_TAG=_fr python x_llm.py train
                              # continue the LoRA on confident test decisions of the countries without train labels
 env QT (stage-2 tag, default _v9p), LLM (base model dir), LLM_N (training pairs), BAND (lo,hi), LLM_DIR (adapter),
@@ -211,5 +213,16 @@ def extend():
         print("wrote", f"{XD}/llm_{split}{QB}{LT}.parquet", flush=True)
 
 
+def rows():
+    """score the test (record, S1) pairs listed in x/{ROWS}.parquet; SHARD=i/n scores every n-th row from the i-th"""
+    name = os.environ["ROWS"]; i, n = map(int, os.environ.get("SHARD", "0/1").split("/"))
+    r = pd.read_parquet(f"{XD}/{name}.parquet").iloc[i::n].copy()
+    T1, T2 = texts("test")
+    r["llm"] = score(model("load"), prompts(T1, T2, r.sid.values, r.rid.values)) if len(r) else np.zeros(0, np.float32)
+    out = f"{XD}/llm_{name}" + (f"_{i}of{n}" if n > 1 else "") + ".parquet"
+    r.to_parquet(out)
+    print("wrote", out, len(r), flush=True)
+
+
 if __name__ == "__main__":
-    {"train": train, "val": val, "test": test, "extend": extend}[sys.argv[1]]()
+    {"train": train, "val": val, "test": test, "extend": extend, "rows": rows}[sys.argv[1]]()

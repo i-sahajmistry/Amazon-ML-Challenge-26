@@ -1,23 +1,36 @@
-"""Two recall fixes on the final scores (after the vetoes and the same-address fixes), from Mohanish's variant_frB.
-  restore_empty  an S1 with no accepted record takes its best candidate if q >= 0.40: an S1 left empty scores 0 as soon
-                 as it has one true match (US / India validation on the bge + LLM stack: +0.00007, `val`). For the
-                 countries without training labels the LLM judge must not say no: the candidates it rejects there are
-                 mostly a type word swapped at the S1's own address (the same-building decoy the same-address fixes
-                 reject).
-  restore_nafr   countries without training labels: a rejected record with no address whose normalised name equals
-                 its S1's and no other S1's of the country, and that the judge accepts. US / India models accept 93-97%
-                 of these records, France 84%: its self-training vetoes learned "no address = reject".
-Both lists leave out the pairs the same-address fixes reject.
+"""Recall fixes on the final scores (after the vetoes and the same-address fixes), from Mohanish's variant_frB.
+  restore_empty     an S1 with no accepted record takes its best candidate if q >= 0.40: an S1 left empty scores 0 as
+                    soon as it has one true match (US / India validation on the bge + LLM stack: +0.00007, `val`). For
+                    the countries without training labels the LLM judge must not say no: the candidates it rejects
+                    there are mostly a type word swapped at the S1's own address (the same-building decoy the
+                    same-address fixes reject).
+  restore_nafr      countries without training labels: a rejected record with no address whose normalised name equals
+                    its S1's and no other S1's of the country, and that the judge accepts. US / India models accept
+                    93-97% of these records, France 84%: its self-training vetoes learned "no address = reject".
+  restore_samename  countries without training labels: a rejected record with its S1's exact name at another house
+                    number, the only record of the S1 at that number, outside the decoy shift (1-13 above the S1's
+                    number: 76-83% of the decoy-cluster records sit there), that the judge accepts. The data generator
+                    moves a true match to another address in every country (US / India 0.05 such records per S1,
+                    France 0.034). On US / India validation they belong to their S1 97-98% of the time when no other S1
+                    has the name, 93% / 87-89% / 68-78% with 1 / 2 / 3+ namesakes (the rest are distractors; almost
+                    never another namesake's record), and the models accept 47-97%; France accepts 5-62%. France's
+                    rejected ones get the judge's yes 69-81% of the time, US / India's rejected ones (1-6% true)
+                    17-44%: by the judge's validation calibration ~70-85% of them are true, ~92% of those it accepts.
+                    Records the judge has not scored (stage-2 q outside its band) go to x/sn_rows.parquet:
+                    `ROWS=sn_rows python x_llm.py rows` scores them, then rerun this script.
+All lists leave out the pairs the same-address fixes reject.
   python x_recall.py COMB LLM RESTORE REJECT   e.g. _fin _v10p restore_dd reject_dd
       COMB: x/test_q{COMB} (x_final.py SAVE_Q); LLM: x/llm_test{LLM}; RESTORE / REJECT: x_ddfix.py's lists
-      -> x/restore_empty.parquet, x/restore_nafr.parquet for x_final.py RESTORE=...
+      -> x/restore_empty.parquet, x/restore_nafr.parquet, x/restore_samename.parquet for x_final.py RESTORE=...
   python x_recall.py val [VQ]                  the empty-S1 rule on US / India validation (x/llm_val{VQ}), with labels"""
-import sys, numpy as np, pandas as pd
+import glob, sys, numpy as np, pandas as pd
 from common import WORK, load, unlabelled
 from match import normed
+from x_anatomy import first
 
 XD = f"{WORK}/x"
 T, TE = 0.70, 0.40
+SHIFT = (1, 13)   # the decoys' house-number shift above the S1's number
 
 
 def lists(comb, llm, restore, reject):
@@ -45,6 +58,29 @@ def lists(comb, llm, restore, reject):
     sel = unl & ~acc & noaddr & ~twin & same & (m > 0) & ~key.isin(rj)
     d[sel][["rid", "sid"]].to_parquet(f"{XD}/restore_nafr.parquet")
     print("restore_nafr", int(sel.sum()), d[sel].c.value_counts().to_dict(), flush=True)
+    # restore_samename: the exact name at another house number of the record's own (namesake S1s allowed: an
+    # address-bearing record's best S1 is its own when it is a true match)
+    cand = unl & ~acc & ~noaddr & same & ~key.isin(rj)
+    ss = np.flatnonzero(np.isin(d.sid.values, d.sid.values[cand]))          # every row of those S1s
+    a = np.array([first(v) for v in t1.num.values[d.sid.values[ss]]])
+    n = np.array([first(v) for v in t2.num.values[d.rid.values[ss]]])
+    at = pd.Series(n).groupby([d.sid.values[ss], n]).transform("size").values
+    sh = n - a
+    sn = np.zeros(len(d), bool)
+    sn[ss[(a >= 0) & (n >= 0) & (sh != 0) & (at == 1) & ~((sh >= SHIFT[0]) & (sh <= SHIFT[1]))]] = True
+    sn &= cand
+    ms = m.copy()
+    for f in sorted(glob.glob(f"{XD}/llm_sn_rows*.parquet")):
+        e = pd.read_parquet(f)
+        e2 = pd.Series(e.llm.values, index=pd.MultiIndex.from_frame(e[["rid", "sid"]])).reindex(key).values
+        ms = np.where(np.isfinite(ms), ms, e2)
+    need = sn & ~np.isfinite(ms)
+    d[need][["rid", "sid"]].reset_index(drop=True).to_parquet(f"{XD}/sn_rows.parquet")
+    sel = sn & (ms > 0)
+    d[sel][["rid", "sid"]].to_parquet(f"{XD}/restore_samename.parquet")
+    print(f"restore_samename {int(sel.sum())} {d[sel].c.value_counts().to_dict()} (candidates {int(sn.sum())}, judge "
+          f"yes {int(sel.sum())} / no {int((sn & (ms <= 0)).sum())}, not scored {int(need.sum())} -> x/sn_rows.parquet)",
+          flush=True)
 
 
 def val(vq):

@@ -4,6 +4,10 @@ Match every Source 2 / Source 3 record to the Source 1 (reference) entity it bel
 This folder holds only the code that builds our submitted file (**leaderboard 0.990807**) and `reproduce.sh`, which
 runs it end to end from the provided data.
 
+> **Branch `E16fr3-sn` (candidate, not the shipped file):** E16fr3 + `restore_samename` in `x_recall.py`: France
+> records with their S1's exact name at another address, alone at that number, outside the decoy shift, that the LLM
+> judge accepts (4,646 restores; matching md5 `519bc93e`). Evidence and checks: [description.md](description.md).
+
 ## Pipeline
 
 Every S2/S3 record belongs to at most one S1 entity (training ground truth: 7.6M matched ids, none reused), so each
