@@ -4,11 +4,40 @@ Match every Source 2 / Source 3 record to the Source 1 (reference) entity it bel
 This folder holds only the code that builds our submitted file (**leaderboard 0.990807**) and `reproduce.sh`, which
 runs it end to end from the provided data.
 
-> **Branch `E16fr3-sn` (candidate, not the shipped file):** E16fr3 + two France recall lists in `x_recall.py`:
-> `restore_samename` (records with their S1's exact name at another address, alone at that number, outside the decoy
-> shift, accepted by the LLM judge; 4,646) and `restore_nacore` (no-address records with the S1's core name and no other
-> S1 with that core name, judge yes; 1,078). Matching md5 `fdea1f55` (idea 1 alone: `519bc93e`). Evidence and checks:
-> [description.md](description.md).
+## Candidate on branch `E16fr3-sn` (not the shipped file)
+
+E16fr3 plus two France recall lists in `x_recall.py`. They apply only to the countries without training labels;
+US / India are unchanged. File: matching md5 `fdea1f55` (idea 1 alone: `519bc93e`), candidate_pairs `1a8b4f5c`
+(unchanged), validator PASS. France accepted 862,152 → 867,859 (+5,707).
+
+| List | Restores | Rule | Evidence |
+|---|---|---|---|
+| `restore_samename` | 4,646 | The S1's exact name at another house number; the only record of the S1 there; not 1–13 above the S1's number (the decoy shift); the LLM judge says yes | US / India validation: 97–98% true with no namesake S1, 68–78% with 3+ namesakes; almost never another namesake's record. Models accept 47–97% there, France 5–62%. France's rejected ones get the judge's yes 69–81% of the time, US / India's rejected ones 17–44%. |
+| `restore_nacore` | 1,078 | No address; the S1's core name (legal form dropped), full name differs; no other S1 with that core name; judge yes | US / India validation: 98% true, and models accept 97.5–98.5%; France accepts 72.5%, so ≥ ~93% of its rejected ones should be true. With a core-name namesake: 44–48% true, so those are left out. |
+
+**Expected leaderboard change** (delta.py-style Monte Carlo over the touched S1s, by the share p of restores that are
+right; break-even p ≈ 0.67 / 0.70):
+
+| p | 0.60 | 0.70 | 0.80 | **0.90** | 0.95 |
+|---|---|---|---|---|---|
+| combined | −0.00007 | +0.00004 | +0.00016 | **+0.00027** | +0.00033 |
+| leaderboard | 0.99074 | 0.99085 | 0.99096 | **0.99108** | 0.99113 |
+
+**Conclusions:**
+- Best estimate: +0.00016 to +0.00033, about 0.9911.
+  - `restore_nacore` is the safer list (p ≈ 0.93–0.98).
+  - `restore_samename` carries the risk (p ≈ 0.85–0.94). 75% of its candidates have generic names shared by 3+ S1s,
+    where US / India are only 68–78% true.
+- The leaderboard reads it clearly: the public-minus-private noise of this change is ~±0.00002.
+  - At or above +0.00005: the gain is real. Merge this branch into `final-dd` and rebuild the package.
+  - At or below E16fr3: France's rejections were mostly right. Stay on E16fr3.
+- Reproducibility:
+  - Without the two lists, the code rebuilds E16fr3 byte for byte (`e93605ad`).
+  - On the clean v10-only rerun the lists give 3,412 + 1,059 restores, validator PASS. `restore_samename` moves
+    between GPU reruns because it only takes records the France chain rejected.
+- Even at the top of the range the file stays ~0.0007 below rank 1 (0.991829).
+
+Details: [description.md](description.md).
 
 ## Pipeline
 
