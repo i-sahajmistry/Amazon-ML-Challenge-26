@@ -77,10 +77,20 @@ md5 e73c409e. Each item: what, evidence, how to apply, decision rule. Details an
 16. **DO NOT APPLY — expected-F0.5 decision per S1 (E20, `exp12.py`):** for each S1, accept the top k claimants that
     maximise the expected F0.5 (Monte Carlo on q, calibration sigmoid(a·logit q + b) cross-fitted). Cross-fitted
     **+0.00004 vs 0.70 but −0.00005 vs 0.70 + rescue**; the simple rescue (item 9) is better. Does not work.
-17. **RUNNING — E21 France "shape" diagnostic (`exp13.py`):** France has no labels, but all countries' test sets come
-    from one generator. Compare France's predicted share of empty S1s / matches per S1 with US / India truth (train)
-    and prediction (validation, test). If France has many more empty S1s, a France rescue is the lever (the rescue
-    now runs for US / India only).
+17. **E21 / E22 — France "shape" check (`exp13.py`, `exp14.py`): NO France recall gap found; do not chase it.**
+    - Train truth is identical for US and India (empty S1s 5.58% / 5.59%, matches per S1 3.459 / 3.465, 4+ 48%), and
+      US / India predictions look the same on validation and test (empty 5.75–5.8%, 3.40 per S1): test behaves like
+      validation.
+    - France predicted: empty 6.16%, **3.31 per S1** (vs 3.40). It looked like ~23k missing France matches, BUT France
+      has fewer records per S1 in test (1,434,993 / 259,452 = **5.53** vs US 5.76, India 5.82), and the share of
+      source-2/3 records we accept is the same or higher in France (**0.599** vs US 0.591, India 0.583). With the same
+      distractor share in every country, France's true clusters are simply smaller (~3.32 per S1), so France's
+      matches-per-S1 gap is explained by the data, not by lost recall.
+    - France rescue: only 312 S1s at t = 0.5 (14.7k of 16k empty France S1s have a best claimant below q 0.1).
+      Lowering the France threshold 0.70 → 0.50 adds only 0.02 per S1.
+    - France chain (accepted records): base 863,509 → after the 3 min-vetoes 837,823 (−25.7k) → + restore 870,443 →
+      − reject **859,338**. 31,331 records with base q ≥ 0.70 are vetoed, 12,586 of them with base q ≥ 0.99, mostly in
+      S1s that keep 2–5+ matches. Whether those vetoes are right can only be judged on the leaderboard.
 
 
 ## Ready-made files on padum (read access granted to aib262144 via setfacl, incl. files written later)
