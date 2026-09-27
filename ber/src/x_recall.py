@@ -204,10 +204,10 @@ def decword(d, unl, t1, t2):
     for c in sorted(set(d.c.values[unl])):
         i = np.flatnonzero(d.c.values == c)
         x = census(positions(d.iloc[i], t1, t2))
-        w = words(x, 300)
+        w = words(x, int(os.environ.get("DEC_MIN", 100)))
         dec = set(w[w.tv >= 0.20].index)
         sel[i[np.array([bool(set(a.split()) & dec) for a in x["add"].values])]] = True
-    d[sel][["rid", "sid"]].to_parquet(f"{XD}/reject_decword.parquet")
+    d[sel][["rid", "sid"]].to_parquet(f"{XD}/reject_decword{os.environ.get("DEC_TAG", "")}.parquet")
     print("reject_decword", int(sel.sum()), d[sel].c.value_counts().to_dict(), f"(accepted now: {int((sel & (d.q.values >= T)).sum())})",
           flush=True)
 
