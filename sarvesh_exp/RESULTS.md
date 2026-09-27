@@ -19,14 +19,14 @@ change can only be judged on the leaderboard; for those we report how many Franc
 | # | What changes (vs baseline) | US / India / France accepted | matching md5 | Evidence | Verdict |
 |---|---|---|---|---|---|
 | E0 | nothing: the variant rebuilt from its files with the generic x_final | 2,255,158 / 2,751,010 / 859,338 | `e73c409e` | byte-identical to the 0.990349 file | ✅ setup correct; generic assembly reproduces the best file exactly |
-| E1 | US / India from the bge stack (v10b + LLM, `_v10bplw`); France unchanged | 2,255,799 / 2,751,628 / 859,338 | `ab07d90e` | bge stack +0.00011–0.00016 US/India validation | ✅ likely +0.0001 LB |
+| E1 | US / India from the bge stack (v10b + LLM, `_v10bplw`); France unchanged | 2,255,799 / 2,751,628 / 859,338 | `ab07d90e` | US/India validation **0.99294 vs 0.99282** (bge + LLM stack vs the variant's LLM stack, Sahaj's llm_stack logs) | ✅ **+0.00012 validation**, ≈ +0.0001 LB |
 | E1b | as E1 with the bge + LLM round-2 stack (`_v10bpl2w`) | 2,255,859 / 2,751,539 / 859,338 | `34173047` | ≈ E1 | ≈ E1 |
 | E2 | E1 + the bge stack as a 4th France veto | … / … / 855,682 (−3,656) | `7a35ceb9` | none (France) | ❓ LB only; vetoes have helped before |
 | E3 | E1, France base from bge + LLM round 2 | … / … / 856,838 (−2,500) | `f8466461` | none (France) | ❓ LB only |
-| E4a | E1, France threshold 0.65 (instead of 0.70) | … / … / 860,784 (+1,446) | pending | none (France); US/India validation is flat 0.60–0.70 | ❓ LB only |
-| E4b | E1, France threshold 0.75 | pending | | none (France) | ❓ LB only |
+| E4a | E1, France threshold 0.65 (instead of 0.70) | … / … / 860,784 (+1,446) | `a95424e3` | none (France); US/India validation is flat 0.60–0.70 | ❓ LB only |
+| E4b | E1, France threshold 0.75 | … / … / 857,378 (−1,960) | `010c7d23` | none (France) | ❓ LB only |
 | E5 | E1 with the generic France fixes (`rule_fr` + `x_ddfix`) instead of the variant's lists | pending | | compares generic vs variant lists | compliance check |
-| E7 | US / India from the **mean** of the bge and main stacks | 2,255,059 / 2,751,092 / 859,338 | | validation 0.99279 < bge alone 0.99283 | ❌ **does not work**: averaging is worse than bge alone |
+| E7 | US / India from the **mean** of the bge and main stacks | 2,255,059 / 2,751,092 / 859,338 | | validation 0.99279 < bge alone 0.99283 | ❌ **does not work**: averaging is worse than bge alone (file `138c24f2` built, PASS, not to be used) |
 
 ## US / India validation (labels; entity folds 8-9, distractors weighted, copy-free), `exp3.py`
 
@@ -39,6 +39,8 @@ change can only be judged on the leaderboard; for those we report how many Franc
 - ✅ bge is better than the main stack by **+0.00021**, in both the US and India → E1.
 - ❌ averaging the two stacks does not help (below bge alone) → E7 dropped.
 - Threshold: 0.70 stays (bge flat 0.60–0.70, lower above).
+- With the LLM blend (Sahaj's `x_llmstack__v10bp__v10bp.log`): bge + LLM **0.99294** at 0.70 (0.60 0.99289, 0.65 0.99291,
+  0.75 0.99290, 0.80 0.99282); the variant's main + LLM stack 0.99282. So E1's US/India gain is +0.00012.
 
 ## Earlier: candidate-set size (`cand_trim.py`, on the v9 shortlist = the same 12.76M pairs)
 Raising the shortlist cut-off from P ≥ 0.001: 0.003 → −8% pairs, cuts 782 of 5.88M accepted matches; 0.005 → −11%,
