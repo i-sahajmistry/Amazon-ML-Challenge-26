@@ -8,6 +8,9 @@ This branch holds only the code that builds the submitted file **v10_fr3_llm_dd 
 France self-training rounds seeded from v10) + two recall fixes (`x_recall.py`); see [variant_frB](#variant_frb).
 **Branch `variant-frC`:** **variant_frC** (leaderboard pending) = variant_frB with US / India from the bge + LLM
 stack (validation +0.00012); France is identical to variant_frB. See [variant_frC](#variant_frc).
+**Branch `variant-frD`:** **variant_frD** (leaderboard pending) = Sarvesh's E17 (US / India from the bge + LLM stack
+on a 5.8% smaller US / India candidate set, with an empty-S1 rescue) + variant_frB's France fixes. See
+[variant_frD](#variant_frd).
 
 ## Pipeline
 
@@ -71,6 +74,7 @@ on entity folds 8–9 after fitting on 4–7 (US / India validation F0.5 0.99282
 
 | File | Score |
 |---|---|
+| variant_frD (`variant-frD`: E17 for US / India + variant_frB's France; 6.94 pairs per S1) | pending |
 | variant_frC (`variant-frC`: variant_frB, US / India from the bge + LLM stack) | pending |
 | variant_frB (`variant-frB`: variant_v10seed_dd + `x_recall.py`) | pending |
 | **variant_v10seed_dd** (France rounds seeded from v10; `variant_v10seed_dd/variant.sh`) | **0.990349** |
@@ -138,3 +142,22 @@ AMLC_ROOT=/variant/root bash variant_frC/frC.sh   # also needs x/test_q_v10bplw 
 
 candidate_pairs.tsv is unchanged (1a8b4f5c). Building it from scratch also needs the bge steps (about 2 GPU hours: fit,
 scoring, stages) before the LLM blend.
+
+## variant_frD
+
+Sarvesh's E17 for US / India plus variant_frB's France fixes. E17 (branch `sarvesh-exp`: `e10_prep.py`,
+`e10_run.pbs`, `exp10.py`) raises the shortlist cut-off for US / India from 0.001 to 0.005 (France keeps all its pairs)
+and retrains stage 1, stage 2 and the LLM blend of the bge stack on the smaller set: US / India validation 0.99287 vs
+0.99289 for the same run on all pairs, within rerun noise. It then gives every US / India S1 with no accepted record its
+best candidate when q >= 0.5 (cross-fitted +0.00009). France is untouched by E17, so variant_frB's France fixes apply
+as they are (`x_recall.py` with `EMPTY_C=unlabelled`).
+```bash
+AMLC_ROOT=/root bash variant_frD/frD.sh   # needs E17's inputs and the variant's files (see the script's header)
+```
+| | US | India | France | candidate pairs | md5 (matching_results) |
+|---|---:|---:|---:|---:|---|
+| E17 (Sarvesh) | 2,256,386 | 2,751,391 | 859,338 | 12,020,996 | eb6fdbec |
+| **variant_frD** = E17 + France: empty-S1 (439) + no-address (5,445) | 2,256,386 | 2,751,391 | 865,174 | **12,020,996** | **76ef7eea** |
+
+candidate_pairs.tsv md5 15fb51cc: 6.94 pairs per S1 (the variant's 7.37), 5.8% fewer; the organisers rank a smaller
+candidate set higher. Building it from scratch needs the bge steps and E10's retrain on the smaller set.

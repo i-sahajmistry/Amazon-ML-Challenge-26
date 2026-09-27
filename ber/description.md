@@ -1,4 +1,4 @@
-# variant_frB / variant_frC: recall fixes on variant_v10seed_dd, and the bge stack for US / India
+# variant_frB / frC / frD: recall fixes on variant_v10seed_dd, the bge stack for US / India, a smaller candidate set
 
 Branch `variant-frB`, built on `final-dd` 187946d. It adds `src/x_recall.py`, `variant_frB/frB.sh` and Sahaj's
 `variant_v10seed_dd/` scripts (from v11), which build the best leaderboard file so far (0.990349).
@@ -73,3 +73,23 @@ variant_frC = variant_frB with US / India from the bge + LLM stack. France is un
   validator `--check-ids` PASS. Built by `variant_frC/frC.sh`, which first reproduces E1 (md5 ab07d90e).
 - **Expected leaderboard:** about 0.9906-0.9907 (variant_frB + ~0.0001).
 - **Cost:** the final build also needs the bge cross-encoder (fit ~50 min, scoring ~1.5 h, stages) before the LLM blend.
+
+## variant_frD (branch `variant-frD`)
+
+variant_frD = Sarvesh's E17 for US / India + variant_frB's France.
+- **E17 (US / India),** built on branch `sarvesh-exp`:
+  - the shortlist cut-off for US / India goes from 0.001 to 0.005, while France keeps all its pairs;
+  - stage 1, stage 2 and the LLM blend of the bge stack are retrained on the smaller set;
+  - validation is unchanged (0.99287 vs 0.99289 for the control run);
+  - US / India S1s with no accepted record take their best candidate when q >= 0.5 (cross-fitted +0.00009).
+- **France:** the variant's chain + `x_recall.py`'s no-address fix (5,445) and empty-S1 rule (439), both for the
+  countries without labels only. `EMPTY_C=unlabelled` keeps US / India exactly as E17. France accepted: 865,174, as
+  in variant_frB / frC.
+- **Output:**
+  - `matching_results.tsv` md5 76ef7eeaa378ee78387179f9986337b9;
+  - `candidate_pairs.tsv` md5 15fb51cc: 12,020,996 pairs, 6.94 per S1 against 7.37 (−5.8%);
+  - validator `--check-ids` PASS; `frD.sh` rebuilds E17 exactly (md5 eb6fdbec) before adding the France lists.
+- **Expected leaderboard:** about 0.9906-0.9907 (same as variant_frC), with a smaller candidate set, which the
+  organisers rank higher.
+- **`x_recall.py`:** new `EMPTY_C=` limits the empty-S1 rule to some countries. The default is unchanged (all
+  countries), so variant_frB / frC rebuild as before.

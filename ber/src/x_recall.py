@@ -10,14 +10,16 @@
                  the rejected ones are mostly wrong (53-62% / 29-32% true), so, like the same-address fixes, this is
                  applied to the countries without labels only.
 Both lists leave out the pairs the same-address fixes reject.
+EMPTY_C=unlabelled (or a country list) limits the empty-S1 rule to those countries (variant_frD: US / India already
+carry Sarvesh's own empty-S1 rescue).
   python x_recall.py COMB LLM RESTORE REJECT   e.g. _varfr _v10p restore_fr_dd reject_fr_dd
       COMB: x/test_q{COMB}, the stage-2 q after the self-training vetoes (x_final.py SAVE_Q); LLM: x/llm_test{LLM},
       the judge's margins on the unsure rows; RESTORE / REJECT: the same-address lists (x_ddfix.py)
       -> x/restore_empty.parquet, x/restore_nafr.parquet for x_final.py RESTORE=...,restore_empty,restore_nafr
   python x_recall.py val [VQ]                  the empty-S1 rule on US / India validation (x/llm_val{VQ}, default
                                                _v10p: v10's validation rows with the judge's margins), with labels"""
-import sys, numpy as np, pandas as pd
-from common import WORK, load, unlabelled
+import os, sys, numpy as np, pandas as pd
+from common import WORK, load, unlabelled, countries
 from match import normed
 
 XD = f"{WORK}/x"
@@ -35,6 +37,8 @@ def lists(comb, llm, restore, reject):
     ct1 = load("test", 1).country.values
     has = np.bincount(d.sid.values[acc], minlength=len(ct1)) > 0
     b = d[~has[d.sid.values] & (d.q.values >= TE) & ~key.isin(rj)].sort_values("q", ascending=False).drop_duplicates("sid")
+    if os.environ.get("EMPTY_C"):
+        b = b[b.c.isin(countries(os.environ["EMPTY_C"]))]
     b[["rid", "sid"]].to_parquet(f"{XD}/restore_empty.parquet")
     print("restore_empty", len(b), b.c.value_counts().to_dict(), flush=True)
     t1, t2 = normed("test", 1), pd.concat([normed("test", 2), normed("test", 3)], ignore_index=True)
