@@ -1,0 +1,22 @@
+#!/bin/bash
+#PBS -N exp_e30
+#PBS -P scai
+#PBS -q scai_q
+#PBS -l select=1:ncpus=2:ngpus=1:mem=80gb
+#PBS -l walltime=00:40:00
+# E30 = E17 + France rescue (t 0.5); E31 = E30 + bge 4th France veto (E19's France) ; E30b = E17 + France rescue t 0.4
+PY=$HOME/scratch/miniconda3/envs/amlc312/bin/python
+R=/scratch/scai/mtech/aib262045/amlc_e10_0.005; X=$R/work/x; E=/scratch/scai/mtech/aib262045/amlc_exp
+export AMLC_ROOT=$R OMP_NUM_THREADS=2 PYTHONPATH=$HOME/scratch/ber_gen_code/ber/src
+cd $HOME/scratch/ber_gen_code/ber/src
+for v in "E30 _fr30 0 0.5" "E31 _fr31 1 0.5" "E30b _fr30b 0 0.4"; do set -- $v
+  echo "===== $1 (veto $3, France rescue t $4)"
+  $PY -u $HOME/scratch/exp/exp22.py $2 $3 $4 || exit 1
+  ln -sfn $X/p5_test_v10b.parquet $X/p5_test$2.parquet
+  $PY -u x_final.py $E/out_$1 $2 0.70 2>&1 | grep -E "^thr|Error|Traceback"
+  (cd $E/student_resource && $PY utils/validate_submission.py --check-ids --test-dir dataset/test --matching $E/out_$1/matching_results.tsv --candidate $E/out_$1/candidate_pairs.tsv 2>&1 | grep -E "PASS|FAIL|rror")
+  md5sum $E/out_$1/*.tsv
+  echo "--- vs E17"; (cd $E && $PY compare.py $E/out_$1/matching_results.tsv $E/out_E17/matching_results.tsv 2>&1 | tail -4)
+done
+echo "--- E31 vs E19"; (cd $E && $PY compare.py $E/out_E31/matching_results.tsv $E/out_E19/matching_results.tsv 2>&1 | tail -4)
+echo "done $(date +%T)"

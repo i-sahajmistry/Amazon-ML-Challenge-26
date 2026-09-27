@@ -1,5 +1,23 @@
 # Experiments on top of the best file (Sarvesh, 27 Sep)
 
+## TL;DR for the final build (latest first) — TRY / AVOID, with why
+**Leaderboard:** the team's 0.990807 submission (6th) included E16 (E1 + US/India empty-S1 rescue) plus the team's own
+changes; E16 alone was +0.0002 on US / India validation.
+
+TRY (in this order):
+1. **E17** (`out_E17`, md5 `eb6fdbec`): E16 on a 5.8% smaller candidate set (12.02M pairs). Why: same validation as E16,
+   smaller candidate file ranks higher.
+2. **France rescue (E30, building)**: the empty-S1 rescue that helped US / India has never been applied to France
+   (312 France S1s at t = 0.5). Why: same principle; E21 shows France empty S1s 6.2% vs US/India 5.8%. LB-only.
+3. **E19 / E31**: + bge stack as a 4th France veto. Why: E23 shows the vetoed France pairs are decoy-like (house-number
+   conflict 25% vs 4% in kept pairs), and vetoes have helped France on the LB before. LB-only.
+
+AVOID (validated on US / India, all ≤ 0 or noise): stack averaging (E7), per-country / per-crowding thresholds (E8,
+E12), lone-match drop (E13b), sibling rule (E15), stage-2 tuning bigger trees / lower lr (E18), expected-F0.5 per S1
+(E20, worse than the simple rescue), second-model veto on US / India (E25), exact / fuzzy name rules for name-only
+records (E26 / E28: their misses are ambiguous, not fixable), house-number rules for US / India (E23: accepted test
+pairs already look like true matches). Do not chase a "France recall gap" (E21 / E22: France just has smaller clusters).
+
 ## FOR THE FINAL BUILD — read this first (kept current)
 Written for whoever builds the final file (team or their assistant). Baseline = `variant_v10seed_dd`, LB 0.990349,
 md5 e73c409e. Each item: what, evidence, how to apply, decision rule. Details and all numbers further down.
@@ -107,8 +125,14 @@ md5 e73c409e. Each item: what, evidence, how to apply, decision rule. Details an
     only)**, e.g. S1 `cure pub @ 1094 ohio river road` vs record `cure pub` with no address → not retrieved.
 21. **DO NOT APPLY — second-model veto on US / India (E25, `exp17.py`):** requiring the main stack to agree
     (France-style min) is flat to negative: cross-fitted −0.000013; min(bge, main) ≥ 0.70 −0.000053.
-22. **RUNNING — E26 name-only records (`exp18.py`):** recall of empty-address records, and a rule matching an
-    empty-address record to the only S1 with the same core name / skeleton, scored on validation.
+22. **E26 — name-only records (`exp18.py`): they are 83% of US / India misses, but mostly unrecoverable.**
+    Records with an empty address are 4.4% of true pairs with recall **0.62** (with address: 0.9965); they make 1.66%
+    of the 1.99% missed pairs. AVOID the exact-name rule (empty-address record → the only S1 with the same core name):
+    99.1% precise, but 22,203 of its 22,542 pairs are already accepted, validation −0.000009 (test file E27a adds 2,867,
+    not recommended). The missed ones share their name with several S1s (26%) or have typos (41%).
+23. **AVOID — fuzzy name channel for missed name-only records (E28, `exp20.py`):** char-trigram TF-IDF on names, the
+    top S1 is right only 22% of the time (names shared by several S1s); best cross-fitted gain +0.000009 (88 pairs).
+24. **No data leak (E29, `exp21.py`):** ids are random, rows are shuffled (neighbouring rows never share an S1).
 
 
 ## Ready-made files on padum (read access granted to aib262144 via setfacl, incl. files written later)

@@ -1,0 +1,21 @@
+#!/bin/bash
+#PBS -N exp_e27
+#PBS -P scai
+#PBS -q scai_q
+#PBS -l select=1:ncpus=4:ngpus=1:mem=100gb
+#PBS -l walltime=00:45:00
+# E27a = E17 + name-only rule for US / India; E27b = + France too.
+PY=$HOME/scratch/miniconda3/envs/amlc312/bin/python
+R=/scratch/scai/mtech/aib262045/amlc_e10_0.005; E=/scratch/scai/mtech/aib262045/amlc_exp
+REF=/scratch/scai/mtech/aib262144/amlc_variant/output_variant_dd/matching_results.tsv
+export AMLC_ROOT=$R OMP_NUM_THREADS=4 PYTHONPATH=$HOME/scratch/ber_gen_code/ber/src
+cd $HOME/scratch/ber_gen_code/ber/src
+for v in "E27a _name27a US,India" "E27b _name27b US,India,France"; do set -- $v
+  echo "===== $1 ($3)"
+  $PY -u $HOME/scratch/exp/exp19.py $2 $3 cn || exit 1
+  $PY -u x_final.py $E/out_$1 $2 0.70 2>&1 | grep -E "^thr|Error|Traceback"
+  (cd $E/student_resource && $PY utils/validate_submission.py --check-ids --test-dir dataset/test --matching $E/out_$1/matching_results.tsv --candidate $E/out_$1/candidate_pairs.tsv 2>&1 | grep -E "PASS|FAIL|rror")
+  md5sum $E/out_$1/*.tsv
+  echo "--- vs E17"; (cd $E && $PY compare.py $E/out_$1/matching_results.tsv $E/out_E17/matching_results.tsv 2>&1 | tail -4)
+done
+echo "done $(date +%T)"
