@@ -74,3 +74,30 @@ matching md5 `fdea1f55`, validator PASS, candidate_pairs unchanged (`1a8b4f5c`).
 list: about +0.00004.
 On Sahaj's v10-only rerun (`amlc_v10only`, sandbox `~/scratch/v10chk`): `restore_nacore` 1,059 (original files 1,078),
 `restore_samename` 3,412; France 865,410; matching md5 `8a6f769d`; validator PASS.
+
+## Expected leaderboard change
+
+Method as Sahaj's `delta.py`. For each S1 the lists touch:
+- E16fr3's other accepted records are taken as true;
+- each added record is true with probability p;
+- an S1 that was empty and gets only wrong records is truly empty half the time.
+
+The per-S1 F0.5 changes are summed over all 1,732,544 S1s (Monte Carlo, 60 draws).
+
+| p (share of added records that are right) | restore_samename (4,646) | restore_nacore (1,078) | combined | leaderboard (E16fr3 0.990807) |
+|---|---|---|---|---|
+| 0.60 | −0.00005 | −0.00002 | −0.00007 | 0.99074 |
+| 0.70 | +0.00004 | +0.00000 | +0.00004 | 0.99085 |
+| 0.80 | +0.00013 | +0.00002 | +0.00016 | 0.99096 |
+| **0.90** | **+0.00023** | **+0.00004** | **+0.00027** | **0.99108** |
+| 0.95 | +0.00027 | +0.00005 | +0.00033 | 0.99113 |
+| 1.00 | +0.00032 | +0.00006 | +0.00038 | 0.99119 |
+
+- **Break-even:** p ≈ 0.67 (restore_samename), 0.70 (restore_nacore).
+- **restore_nacore, p ≈ 0.93–0.98:** the same kind is 98% true in US / India, and France rejects 27.5% of it.
+- **restore_samename, p ≈ 0.85–0.94:**
+  - US / India true shares, weighted by France's namesake counts, give ~78% before the judge; its yes lifts that to
+    ~90–94%.
+  - The risk is France's generic names: 75% of the candidates have 3+ namesake S1s, where US / India are 68–78% true.
+- **Split noise:** sd of the public-minus-private gain ~2.3e-5 (30% public share), so the leaderboard reads the result
+  clearly.
