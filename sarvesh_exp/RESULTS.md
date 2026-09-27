@@ -32,7 +32,11 @@ US / India untouched): `out_E16fr3_llmveto6` (safest), **`out_E16fr3_llmveto4` (
 (same address or alias: `CP` 30 R. des Meuniers for *Comité des Petanque*), ~8 the same generic name on the same street
 at a very different number (*Tourcoing Amicale* 211 vs 77 R Ingres — namesakes / decoys the vetoes rightly removed), 2–3
 type-word swaps at the same address (*Nantes Union* → *Nantes Societe*). **E50 (running)** keeps only restores whose house
-numbers agree or whose record has no number (all 11 true ones pass, all 8 number conflicts drop) → `out_E16fr3_llmveto{2,4,6}n`.
+numbers agree or whose record has no number (all 11 true ones pass, all 8 number conflicts drop) → built, PASS:
+`out_E16fr3_llmveto6n` **+482** France (`9176d901`), **`out_E16fr3_llmveto4n` +1,696 (`34c1c028`)**, `out_E16fr3_llmveto2n`
++3,863 (`97c5e0b3`). Note: on US / India the number filter does not help (vetoed number-conflicting records there are
+91% true vs 80% compatible — US / India true matches carry number noise), so the filter is justified by the France hand
+check only (France decoys: same generic name, same street, other number). Hand check of llmveto4n pending.
 Unfiltered md5s (for reference): llmveto2 `e15a2126` (+5,505), llmveto4 `6ab49633` (+2,469), llmveto6 `4236d873` (+633).
 
 **LEADERBOARD PROBES ON E16fr3 (ready to upload; US / India byte-identical to E16fr3, only France changes; all PASS
