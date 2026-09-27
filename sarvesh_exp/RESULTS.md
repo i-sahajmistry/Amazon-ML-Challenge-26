@@ -74,6 +74,17 @@ md5 e73c409e. Each item: what, evidence, how to apply, decision rule. Details an
     only lever big enough to matter.
 
 
+## Ready-made files on padum (read access granted to aib262144 via setfacl, incl. files written later)
+| What | Path (under `/scratch/scai/mtech/aib262045/`) |
+|---|---|
+| Submission-ready outputs (candidate_pairs.tsv + matching_results.tsv) | `amlc_exp/out_E17/` (best validated), `amlc_exp/out_E19/` (E17 + E2), `amlc_exp/out_E16/`, `out_E1` … `out_E9` |
+| E17 inputs: US / India bge + LLM q on the smaller candidate set, rescue applied | `amlc_e10_0.005/work/x/test_q_v10bplw.parquet` (before rescue), `test_q_resc17.parquet` (after), `p5_test_v10b.parquet` (= the 12.02M candidates) |
+| Smaller-set sandbox (feats2, CE arrays, extras cut at shortlist P ≥ 0.005) | `amlc_e10_0.005/work/` |
+| Control rerun (all pairs) and stage-2 tuning runs | `amlc_e10_0.001/`, `amlc_s2_lr/`, `amlc_s2_big/` |
+| Job scripts + logs exactly as run | `exp/` (`exp10.pbs` = E17, `exp11.pbs` = E19, `e10_run.pbs`, `s2tune.pbs`) |
+To rebuild E17 in place: `AMLC_ROOT=/scratch/scai/mtech/aib262045/amlc_e10_0.005` + the `x_final.py` line in `exp10.pbs`
+(write OUT to your own dir; the FROM / RESTORE / REJECT files are symlinks to your variant files).
+
 Not part of the submission package (this folder is outside `ber/`). Scripts here are exactly what ran on padum.
 
 ## Baseline
