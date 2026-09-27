@@ -1,0 +1,18 @@
+#!/bin/bash
+#PBS -N build5
+#PBS -P scai
+#PBS -q scai_q
+#PBS -l select=1:ncpus=2:ngpus=1:mem=60gb
+#PBS -l walltime=00:45:00
+PY=$HOME/scratch/miniconda3/envs/amlc312/bin/python
+E=/scratch/scai/mtech/aib262045/amlc_exp; B=/scratch/scai/mtech/aib262144/amlc_team/output_E16fr3
+export AMLC_ROOT=/scratch/scai/mtech/aib262045/amlc_e10_0.005 OMP_NUM_THREADS=2 PYTHONPATH=$HOME/scratch/ber_gen_code/ber/src
+cd $HOME/scratch/ber_gen_code/ber/src
+$PY -u $HOME/scratch/exp/build5.py || exit 1
+for v in E17fr3 E16fr3_blankFR E16fr3_frresc30 E16fr3_uiresc30 E16fr3_uiresc50; do
+  echo "===== $v"
+  (cd $E/student_resource && $PY utils/validate_submission.py --check-ids --test-dir dataset/test --matching $E/out_$v/matching_results.tsv --candidate $E/out_$v/candidate_pairs.tsv 2>&1 | grep -E "PASS|FAIL|rror")
+  md5sum $E/out_$v/*.tsv
+  (cd $E && $PY compare.py $E/out_$v/matching_results.tsv $B/matching_results.tsv 2>&1 | tail -4)
+done
+echo "done $(date +%T)"

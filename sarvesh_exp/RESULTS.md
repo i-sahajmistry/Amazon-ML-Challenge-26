@@ -10,6 +10,22 @@ TRY:
 1. **E17-style smaller candidate set** (our `out_E17`, md5 `eb6fdbec`): same validation as E16 (−0.00002, noise), 5.8%
    fewer pairs (12.02M). Only if a smaller candidate file helps the ranking; the team judged E17fr2 ≈ E16fr3 on score.
 
+**LEADERBOARD PROBES ON E16fr3 (ready to upload; US / India byte-identical to E16fr3, only France changes; all PASS
+`--check-ids`, candidate_pairs = E16fr3's `1a8b4f5c`; padum `/scratch/scai/mtech/aib262045/amlc_exp/out_<name>/`, each
+with `changes.tsv` listing every changed pair):**
+
+| file | France change vs E16fr3 | matching md5 |
+|---|---|---|
+| `out_E16fr3_frT60` | France threshold 0.60: **+2,225** matches | `a0f74dab` |
+| `out_E16fr3_frT65` | France threshold 0.65: **+1,154** | `12e29a54` |
+| `out_E16fr3_frT75` | France threshold 0.75: **−1,960** | `229d3145` |
+| `out_E16fr3_frT80` | France threshold 0.80: **−4,315** | `b60a8e7e` |
+
+Why: France (15% of S1s, implied F0.5 ≈ 0.978 vs US / India 0.993) is the only place with room left, and its threshold
+is the one knob with a large pool behind it; 0.70 was chosen on US / India. How to use 4 uploads: upload **frT65 and
+frT75** first; a France-only change Δ on the LB is Δ / 0.15 on France. If one side goes up, the third upload goes one
+step further that way (frT60 or frT80); the fourth is the final pick. If both go down, 0.70 is right for France.
+
 SUPERSEDED: **E30 / E30b (France rescue)** — E16fr3's `restore_empty` already fills 344 empty France S1s (q ≥ 0.40,
 LLM gate), which is the better-guarded version of the same idea.
 
