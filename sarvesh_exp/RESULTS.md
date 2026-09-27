@@ -21,9 +21,14 @@ with `changes.tsv` listing every changed pair):**
 | `out_E16fr3_frT75` | France threshold 0.75: **−1,960** | `229d3145` |
 | `out_E16fr3_frT80` | France threshold 0.80: **−4,315** | `b60a8e7e` |
 
+| `out_E16fr3_frresc30` | France empty-S1 rule at t 0.30 (E16fr3: 0.40, same judge gate): **+79** France S1s filled | `bdb4af7e` |
+| `out_E17fr3` | **E16fr3 on the 5.8% smaller candidate set** (candidate_pairs `15fb51cc`, 12,020,996 pairs): US / India from the smaller-set model + empty-S1 rule t 0.40 (995 filled), France = E16fr3 exactly; 99.6% of US / India rows identical to E16fr3 | `1abe4718` |
+| `out_E16fr3_blankFR` | **diagnostic only**: every France S1 left empty. LB_blank = 0.85025 × F(US+India) + 0.14975 × (share of France S1s with no true match, ≈ 0.0558 as in US / India train); with LB(E16fr3) it gives the exact US / India LB score and France's F0.5 (≈ ±0.0002) | `cf05e087` |
+
 Why: France (15% of S1s, implied F0.5 ≈ 0.978 vs US / India 0.993) is the only place with room left, and its threshold
-is the one knob with a large pool behind it; 0.70 was chosen on US / India. How to use 4 uploads: upload **frT65 and
-frT75** first; a France-only change Δ on the LB is Δ / 0.15 on France. If one side goes up, the third upload goes one
+is the one knob with a large pool behind it; 0.70 was chosen on US / India. How to use 4 uploads: the France score is a min of 4
+models (biased low; on US / India validation the same veto chain rejects ~4× more true than false matches, E42) and every
+France change that added matches has helped on the LB so far, so **frT65 first** (then frT60 if up, frT75 if down); a France-only change Δ on the LB is Δ / 0.15 on France. If one side goes up, the third upload goes one
 step further that way (frT60 or frT80); the fourth is the final pick. If both go down, 0.70 is right for France.
 
 SUPERSEDED: **E30 / E30b (France rescue)** — E16fr3's `restore_empty` already fills 344 empty France S1s (q ≥ 0.40,
