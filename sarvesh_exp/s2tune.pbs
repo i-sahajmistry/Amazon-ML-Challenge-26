@@ -1,0 +1,23 @@
+#!/bin/bash
+#PBS -N s2tune
+#PBS -P scai
+#PBS -q scai_q
+#PBS -l select=1:ncpus=8:ngpus=1:mem=250gb
+#PBS -l walltime=01:30:00
+# E18: stage-2 tuning on the bge stack, reusing the E10 control's stage 1 (all pairs, same code / randomness).
+# Control (BAG=5, lr 0.05, 63 leaves): stage 2 0.70 0.99274, + LLM 0.70 0.99289. V = variant name, P2X / BAG from qsub -v.
+PY=$HOME/scratch/miniconda3/envs/amlc312/bin/python
+C=/scratch/scai/mtech/aib262045/amlc_e10_0.001; R=/scratch/scai/mtech/aib262045/amlc_s2_$V
+case $V in lr) P2X='{"learning_rate":0.025}';; big) P2X='{"num_leaves":127,"min_data_in_leaf":200}';; esac
+mkdir -p $R/work/x; ln -sfn $C/student_resource $R/student_resource
+for f in $C/work/*; do [ "$(basename $f)" = x ] || ln -sfn $(readlink -f $f) $R/work/$(basename $f); done
+for f in $C/work/x/*; do case $(basename $f) in gbm5s2*|val_q*|test_q*|p5_test_v10bp*) ;; *) ln -sfn $(readlink -f $f) $R/work/x/$(basename $f);; esac; done
+export PYTHONPATH=$HOME/scratch/ber_gen_code/ber/src OMP_NUM_THREADS=8 NT=8 AMLC_ROOT=$R DFOLD=1
+cd $HOME/scratch/ber_gen_code/ber/src
+echo "== $V: BAG=$BAG P2X=$P2X  stage 2 $(date +%T)"
+CE_TAGS=_n10,_r10,_b10 TAG=_v10b BAG=$BAG PEERS=1 P2X="$P2X" $PY -u x_nocopy.py test > $R/s2.log 2>&1 || { tail -20 $R/s2.log; exit 1; }
+grep -E "best iteration" -A1 $R/s2.log | grep valid | head -3
+grep -E "weighted-trained, copy-free" $R/s2.log
+echo "== LLM blend $(date +%T)"; $PY -u x_llmstack.py _v10bp _v10bp > $R/llm.log 2>&1 || { tail -20 $R/llm.log; exit 1; }
+grep -E "stage-2 .*LLM" $R/llm.log
+echo "done $(date +%T)"

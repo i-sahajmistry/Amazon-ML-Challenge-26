@@ -58,8 +58,14 @@ md5 e73c409e. Each item: what, evidence, how to apply, decision rule. Details an
     US / India validation at 0.70, same code both sides: control **0.99289** vs smaller set **0.99287** (+LLM;
     stage 2 alone 0.99274 vs 0.99277). The difference (−0.00002) is below rerun noise (this control gives 0.99289 vs
     Sahaj's 0.99294 for the same setup). **Use it only if the smaller candidate file matters for ranking**; it
-    needs the US / India test q from the smaller run plus the rescue re-applied — **building as E17** (`exp10.py`,
-    job 1067974): E16 on the smaller candidate set.
+    needs the US / India test q from the smaller run plus the rescue re-applied. **Ready-made file = E17**
+    (`exp10.py`): E16 on the smaller candidate set. candidate_pairs **12,020,996** (md5 `15fb51cc`) vs 12,760,925;
+    720 S1s rescued (US 375, India 345); accepted US / India / France 2,256,386 / 2,751,391 / 859,338; matching md5
+    **`eb6fdbec`**; validator `--check-ids` **PASS**; France byte-identical to the variant. vs E16: 99.6% of S1 rows
+    identical (the retrain moves ~3.5k pairs each way, F0.5 0.9992 between them) — same validation.
+    **Choose E17 over E16 if the smaller candidate file counts; otherwise they are equivalent.**
+14. **RUNNING — stage-2 tuning (E18, `s2tune.pbs`)** on the E10 control's stage 1 (control + LLM 0.70 = 0.99289):
+    `lr` = learning rate 0.05 → 0.025 with BAG 10; `big` = 127 leaves, min_data_in_leaf 200, BAG 5.
 
 
 Not part of the submission package (this folder is outside `ber/`). Scripts here are exactly what ran on padum.
@@ -91,7 +97,8 @@ change can only be judged on the leaderboard; for those we report how many Franc
 | E8 | per-country thresholds (US / India validation, bge stack) | — | — | +0.00001 at best (US 0.625, India 0.675) | ❌ **does not work** |
 | E9 | France base from the bge + LLM stack, same vetoes + fixes | … / … / 857,002 (−2,336) | `ae0ecb86` | none (France) | ❓ LB only |
 | E16 | E1 + rescue empty S1s at q ≥ 0.5 (US / India) | 2,256,168 / 2,751,925 / 859,338 | `a019f175` | validation E1 +0.00012, rescue +0.00009 cross-fitted; 666 S1s rescued | ✅ **best validated file**, PASS |
-| E10 | US / India shortlist cut-off 0.005 (−5.8% test pairs), full retrain | (not built) | — | validation +LLM 0.99287 vs control 0.99289 | ✅ no measurable cost; optional, for a smaller candidate file |
+| E10 | US / India shortlist cut-off 0.005 (−5.8% test pairs), full retrain | (see E17) | — | validation +LLM 0.99287 vs control 0.99289 | ✅ no measurable cost; optional, for a smaller candidate file |
+| E17 | E16 on the E10 smaller candidate set (US / India P ≥ 0.005, retrained) | 2,256,386 / 2,751,391 / 859,338 | `eb6fdbec` | candidates 12.02M (−5.8%, `15fb51cc`); validation as E16 | ✅ **best validated file with a smaller candidate set**, PASS |
 | E7 | US / India from the **mean** of the bge and main stacks | 2,255,059 / 2,751,092 / 859,338 | | validation 0.99279 < bge alone 0.99283 | ❌ **does not work**: averaging is worse than bge alone (file `138c24f2` built, PASS, not to be used) |
 
 ## Per-country comparison against the variant (0.990349): what each file changes
