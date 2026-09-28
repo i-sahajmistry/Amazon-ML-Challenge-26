@@ -56,7 +56,7 @@ We measured these on the provided files (train: US and India; test: US, India an
 3. **The metric rewards recall per entity:** an S1 left empty scores 0 as soon as it has one true match, so an empty
    S1 takes its best candidate above a lower bar (validated on the labelled countries).
 
-![Pipeline](pipeline.png)
+![Pipeline](code/business_entity_resolution/pipeline.png)
 
 *Figure: the full pipeline. Green = trained model, purple = learned from the records without labels, orange = applied
 only to countries without training labels, blue = submitted files.*
