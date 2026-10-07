@@ -3,8 +3,11 @@
 Team SSM's solution to the Amazon ML Challenge 2026 business entity resolution task: link every noisy business
 record from two sources to the one reference business it describes, or to none.
 
+**Top 10 out of 32,000+ teams**, and selected to present the solution to a jury of Amazon Applied Scientists.
+
 | Metric | Score |
 |---|---|
+| Final ranking | **Top 10** of 32,000+ teams |
 | Public leaderboard, macro F0.5 (US / India / France) | **0.990934** |
 | Validation, macro F0.5 (US / India, held-out entities) | **0.9930** |
 | Candidate pairs per reference entity | **7.37** (1.28 per record) |
